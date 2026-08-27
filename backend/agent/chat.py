@@ -125,6 +125,8 @@ async def process_message(
             consecutive_neg += 1
         else:
             break
+    # D1：持久化连续负面情绪轮数
+    sess.consecutive_negative_turns = consecutive_neg
     crisis_level = detect_crisis(
         user_message or "",
         {"consecutive_negative_turns": consecutive_neg},

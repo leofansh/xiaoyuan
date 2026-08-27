@@ -43,6 +43,11 @@ class SessionState(BaseModel):
     consecutive_wrong: int = 0          # 当前状态内连续错误数
     turns_in_current_state: int = 0     # 当前状态停留轮数（熔断用）
     last_error_type: str = ""           # 最近一轮错误类型（careless/concept/formula/steps/reading）
+    # D1：状态机动态化字段
+    current_strategy: str = ""          # 当前使用的教学策略
+    current_thinking_model: str = ""    # 当前使用的思维模型
+    state_entry_time: str = ""          # 进入当前状态的时间
+    consecutive_negative_turns: int = 0  # 连续负面情绪轮数
 
 
 class SessionSummary(BaseModel):
@@ -181,8 +186,15 @@ class Student(BaseModel):
     crisis_events: list[dict[str, Any]] = Field(default_factory=list)  # 心理危机事件记录
     interests: list[str] = Field(default_factory=list)          # 兴趣爱好列表，如 ["烘焙", "游戏"]
     preferences: dict[str, str] = Field(default_factory=dict)   # 偏好设置，如 {"favorite_metaphor": "烘焙"}
+    parent_notifications: list[dict[str, Any]] = Field(default_factory=list)  # 家长通知（F1）
 
     current_session: SessionState = Field(default_factory=SessionState)
+
+    def last_session_date(self) -> str:
+        """最近一次学习日期（无则空串）。"""
+        if self.session_history:
+            return self.session_history[-1].date
+        return ""
 
     def open_gaps(self) -> list[Gap]:
         return [g for g in self.gaps if g.status in ("open", "recurring")]

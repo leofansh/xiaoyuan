@@ -183,6 +183,25 @@ def get_weekly_report(student_id: str):
     return generate_weekly_report(s)
 
 
+@app.get("/api/student/{student_id}/notifications")
+def get_notifications(student_id: str):
+    """获取家长通知列表（F1）。"""
+    s = _load_student(student_id)
+    # 每次查询前检查是否需要生成新通知
+    from backend.services.parent_notification import check_and_notify
+    check_and_notify(s)
+    return {"notifications": s.parent_notifications}
+
+
+@app.get("/api/student/{student_id}/learning-plan")
+def get_learning_plan(student_id: str):
+    """获取本周学习计划（D2）。"""
+    from backend.services.learning_path import generate_weekly_plan
+    s = _load_student(student_id)
+    plan = generate_weekly_plan(s)
+    return plan.model_dump()
+
+
 @app.get("/api/student/{student_id}/history")
 def get_history(student_id: str):
     s = _load_student(student_id)

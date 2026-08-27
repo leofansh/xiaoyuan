@@ -12,6 +12,8 @@ VALID_STATES = {
     "BLIND_SPOT", "CORE_DERIVE", "EXAMPLE_CHECK", "ERROR_REVIEW",
     "OPTIONAL_VARIANT", "QUICK_REVIEW", "FIX_ONE_ERROR", "WEEKEND_CLEAR",
     "WRAP_UP", "DONE", "THINKING_TRAINING",
+    # D1：动态化新增状态
+    "ANALOGY_EXPLANATION", "VISUALIZATION", "ERROR_ROOT_CAUSE", "BREAK_SUGGESTION",
 }
 
 VALID_TRANSITIONS = {
@@ -20,16 +22,23 @@ VALID_TRANSITIONS = {
     "MODE_SELECT": {"BLIND_SPOT", "PLAN", "QUICK_REVIEW", "WEEKEND_CLEAR"},
     "PLAN": {"CORE_DERIVE", "PLAN"},
     "BLIND_SPOT": {"PLAN", "CORE_DERIVE", "BLIND_SPOT"},
-    "CORE_DERIVE": {"EXAMPLE_CHECK", "CORE_DERIVE", "WRAP_UP"},
-    "EXAMPLE_CHECK": {"ERROR_REVIEW", "OPTIONAL_VARIANT", "EXAMPLE_CHECK", "CORE_DERIVE"},
-    "ERROR_REVIEW": {"OPTIONAL_VARIANT", "FIX_ONE_ERROR", "WRAP_UP"},
-    "OPTIONAL_VARIANT": {"WRAP_UP", "OPTIONAL_VARIANT"},
-    "QUICK_REVIEW": {"FIX_ONE_ERROR", "WRAP_UP"},
-    "FIX_ONE_ERROR": {"WRAP_UP", "FIX_ONE_ERROR"},
-    "WEEKEND_CLEAR": {"WRAP_UP", "WEEKEND_CLEAR"},
+    "CORE_DERIVE": {"EXAMPLE_CHECK", "CORE_DERIVE", "WRAP_UP",
+                    "ANALOGY_EXPLANATION", "VISUALIZATION", "BREAK_SUGGESTION"},
+    "EXAMPLE_CHECK": {"ERROR_REVIEW", "OPTIONAL_VARIANT", "EXAMPLE_CHECK", "CORE_DERIVE",
+                      "BREAK_SUGGESTION"},
+    "ERROR_REVIEW": {"OPTIONAL_VARIANT", "FIX_ONE_ERROR", "WRAP_UP", "ERROR_ROOT_CAUSE", "BREAK_SUGGESTION"},
+    "OPTIONAL_VARIANT": {"WRAP_UP", "OPTIONAL_VARIANT", "BREAK_SUGGESTION"},
+    "QUICK_REVIEW": {"FIX_ONE_ERROR", "WRAP_UP", "BREAK_SUGGESTION"},
+    "FIX_ONE_ERROR": {"WRAP_UP", "FIX_ONE_ERROR", "BREAK_SUGGESTION"},
+    "WEEKEND_CLEAR": {"WRAP_UP", "WEEKEND_CLEAR", "BREAK_SUGGESTION"},
     "WRAP_UP": {"DONE"},
     "DONE": set(),
     "THINKING_TRAINING": {"WRAP_UP", "THINKING_TRAINING"},
+    # D1 动态状态：完成特殊讲解后回到主流程
+    "ANALOGY_EXPLANATION": {"CORE_DERIVE", "EXAMPLE_CHECK", "BREAK_SUGGESTION"},
+    "VISUALIZATION": {"CORE_DERIVE", "EXAMPLE_CHECK", "BREAK_SUGGESTION"},
+    "ERROR_ROOT_CAUSE": {"FIX_ONE_ERROR", "CORE_DERIVE", "WRAP_UP", "BREAK_SUGGESTION"},
+    "BREAK_SUGGESTION": {"CORE_DERIVE", "EXAMPLE_CHECK", "WRAP_UP", "BREAK_SUGGESTION"},
 }
 
 
@@ -218,6 +227,17 @@ def apply_eval(student: Student, eval_data: dict) -> list[str]:
     mastery_values = [v for v in (eval_data.get("mastery_updates") or {}).values() if isinstance(v, (int, float))]
     mastery_avg = sum(mastery_values) / len(mastery_values) if mastery_values else None
 
+    # D1：传入认知画像与题型信息驱动动态化
+    _cp = student.cognitive_profile
+    _problem_type = ""
+    if student.current_session.topic_id:
+        from backend.agent.strategy_engine import infer_problem_type
+        _n = syllabus.get_node(student.current_session.topic_id)
+        _problem_type = infer_problem_type(
+            topic_name=_n.name if _n else "",
+            user_message=student.current_session.history[-1]["content"] if student.current_session.history else "",
+        )
+
     transition = decide_next_state(
         current=current_state,
         llm_suggested_state=llm_state,
@@ -225,12 +245,17 @@ def apply_eval(student: Student, eval_data: dict) -> list[str]:
         consecutive_wrong=sess_counts.consecutive_wrong,
         turns_in_current_state=sess_counts.turns_in_current_state,
         mastery_avg=mastery_avg,
+        abstract_thinking=_cp.abstract_thinking,
+        learning_preference=_cp.learning_preference,
+        problem_type=_problem_type,
     )
 
-    # 6d. 应用最终状态；若变化则重置停留轮数与连续计数
+    # 6d. 应用最终状态；若变化则重置停留轮数/连续计数，并记录进入时间
     if transition.new_state != current_state:
+        from datetime import datetime as _dt
         student.current_session.state = transition.new_state
         student.current_session.turns_in_current_state = 0
+        student.current_session.state_entry_time = _dt.now().isoformat(timespec="seconds")
         # 状态推进后重置连续计数，避免跨状态累积
         student.current_session.consecutive_correct = 0
         student.current_session.consecutive_wrong = 0

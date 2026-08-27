@@ -36,34 +36,49 @@ def decide_next_state(
     consecutive_wrong: int = 0,
     turns_in_current_state: int = 0,
     mastery_avg: Optional[float] = None,
+    abstract_thinking: Optional[float] = None,
+    learning_preference: str = "",
+    problem_type: str = "",
 ) -> StateTransitionResult:
-    """根据确定性规则决定下一个状态。
+    """根据确定性规则决定下一个状态（A1 + D1 动态化）。
 
-    规则：
-    1. 熔断 — 同状态停留过久 → BREAK 处理（这里映射到合法收尾/保持，避免非法状态）
-    2. 连续错误 → 回退或换策略（仅在存在合法回退路径时）
-    3. 连续正确 → 推进（仅在存在合法推进路径时）
-    4. LLM 建议（合法性校验后采纳）
-    5. 保持当前状态
+    规则优先级：
+    1. 熔断 — 同状态停留过久 → BREAK_SUGGESTION（若合法）或收尾
+    2. 连续错误 → 回退或进入特殊讲解状态（ANALOGY/VISUALIZATION/ERROR_ROOT_CAUSE）
+    3. 连续正确 → 推进（遵循转发表）
+    4. 掌握度足够 → 跳过中间检查（D1：已掌握跳过 EXAMPLE_CHECK）
+    5. LLM 建议（合法性校验后采纳）
+    6. 保持当前状态
     """
-    # ===== 规则1：熔断（同状态停留过久，防止卡死/无限循环）=====
+    # ===== 规则1：熔断（D1：同状态停留过久 → 休息建议）=====
     if turns_in_current_state >= 8:
-        # 引导到 WRAP_UP 收尾（若合法），否则保持
+        if _is_valid(current, "BREAK_SUGGESTION"):
+            return StateTransitionResult("BREAK_SUGGESTION", f"在 {current} 停留 {turns_in_current_state} 轮，触发休息建议", "rule")
         if _is_valid(current, "WRAP_UP"):
-            return StateTransitionResult("WRAP_UP", f"在 {current} 状态停留 {turns_in_current_state} 轮，触发注意力熔断收尾", "rule")
-        return StateTransitionResult(current, f"在 {current} 停留过久但无合法收尾路径，保持（turns={turns_in_current_state}）", "keep")
+            return StateTransitionResult("WRAP_UP", f"在 {current} 停留过久，收尾", "rule")
+        return StateTransitionResult(current, f"在 {current} 停留过久且无休息/收尾路径，保持", "keep")
 
-    # ===== 规则2：连续错误 → 回退/换策略 =====
+    # ===== 规则2：连续错误 → 特殊讲解或回退（D1）=====
     if consecutive_wrong >= 3:
+        # 抽象思维低 + CORE_DERIVE 连续错 → 类比讲解
+        if current == "CORE_DERIVE" and abstract_thinking is not None and abstract_thinking < 0.4:
+            if _is_valid(current, "ANALOGY_EXPLANATION"):
+                return StateTransitionResult("ANALOGY_EXPLANATION", f"连续 {consecutive_wrong} 错且抽象思维低，转入类比讲解", "rule")
+        # 几何/行程类 + visual 偏好 → 图形化引导
+        if problem_type in ("geometry", "motion", "engineering", "ratio") and learning_preference == "visual":
+            if _is_valid(current, "VISUALIZATION"):
+                return StateTransitionResult("VISUALIZATION", f"几何/行程题 + visual 偏好，转入图形化引导", "rule")
+        # 错误可识别 → 错误根因分析（ERROR_REVIEW 状态下）
+        if current == "ERROR_REVIEW":
+            if _is_valid(current, "ERROR_ROOT_CAUSE"):
+                return StateTransitionResult("ERROR_ROOT_CAUSE", f"连续 {consecutive_wrong} 错，转入错误根因分析", "rule")
         # 例题检查连续错 → 回退核心推导
         if _is_valid(current, "CORE_DERIVE"):
-            return StateTransitionResult("CORE_DERIVE", f"连续 {consecutive_wrong} 轮出错，回退到核心推导重新讲解", "rule")
-        # 核心推导连续错 → 保持当前并提示换策略（无 ANALOGY 状态，保持 CORE_DERIVE 让 LLM 换讲解方式）
+            return StateTransitionResult("CORE_DERIVE", f"连续 {consecutive_wrong} 轮出错，回退到核心推导", "rule")
         return StateTransitionResult(current, f"连续 {consecutive_wrong} 轮出错，保持当前状态并切换讲解策略", "keep")
 
     # ===== 规则3：连续正确 → 推进（遵循转发表）=====
     if consecutive_correct >= 2:
-        # 按当前状态确定可推进的下一状态
         next_map = {
             "BLIND_SPOT": "CORE_DERIVE",
             "PLAN": "CORE_DERIVE",
@@ -71,12 +86,23 @@ def decide_next_state(
             "EXAMPLE_CHECK": "OPTIONAL_VARIANT",
             "QUICK_REVIEW": "FIX_ONE_ERROR",
             "FIX_ONE_ERROR": "WRAP_UP",
+            "ANALOGY_EXPLANATION": "CORE_DERIVE",
+            "VISUALIZATION": "CORE_DERIVE",
+            "ERROR_ROOT_CAUSE": "FIX_ONE_ERROR",
+            "BREAK_SUGGESTION": "CORE_DERIVE",
         }
         nxt = next_map.get(current)
         if nxt and _is_valid(current, nxt):
             return StateTransitionResult(nxt, f"连续 {consecutive_correct} 轮正确，推进到 {nxt}", "rule")
 
-    # ===== 规则4：LLM 合法建议 =====
+    # ===== 规则4：掌握度足够 → 跳过中间检查（D1）=====
+    if current == "CORE_DERIVE" and mastery_avg is not None and mastery_avg >= 0.7:
+        if _is_valid(current, "OPTIONAL_VARIANT"):
+            return StateTransitionResult("OPTIONAL_VARIANT", f"掌握度 {mastery_avg:.2f} 足够，跳过例题检查直达变式", "rule")
+        if _is_valid(current, "EXAMPLE_CHECK"):
+            return StateTransitionResult("EXAMPLE_CHECK", f"掌握度 {mastery_avg:.2f} 足够，快速进入例题自检", "rule")
+
+    # ===== 规则5：LLM 合法建议 =====
     if _is_valid(current, llm_suggested_state) and llm_suggested_state != current:
         return StateTransitionResult(
             llm_suggested_state,
@@ -84,7 +110,7 @@ def decide_next_state(
             "llm",
         )
 
-    # ===== 规则5：保持当前 =====
+    # ===== 规则6：保持当前 =====
     return StateTransitionResult(current, "无明确转移信号，保持当前状态", "keep")
 
 

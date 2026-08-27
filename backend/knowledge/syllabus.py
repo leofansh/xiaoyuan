@@ -23,6 +23,9 @@ class KnowledgeNode:
     working_memory_demand: int = 1  # 工作记忆需求 1-5
     domain: str = "general"   # algebra/geometry/number_theory/stats/general
     common_thinking_models: list[str] = field(default_factory=list)  # 常用思维模型ID
+    # E2：掌握度判定标准（可观察可验证）+ 典型错误模式
+    mastery_criteria: list[str] = field(default_factory=list)
+    typical_errors: list[str] = field(default_factory=list)  # ERROR_PATTERN_LIBRARY ID
 
 
 # ---------------------------------------------------------------------------
@@ -270,6 +273,14 @@ NODES: list[KnowledgeNode] = [
         working_memory_demand=3,
         domain="algebra",
         common_thinking_models=["transformation", "reverse"],
+        mastery_criteria=[
+            "能正确识别一元一次方程（只含一个未知数，次数为1）",
+            "能熟练运用等式性质进行移项、合并同类项，正确率≥80%",
+            "能正确解出形如 ax+b=c 的方程",
+            "能将简单应用题转化为一元一次方程并求解",
+            "能解释每一步变形的依据（等式性质）",
+        ],
+        typical_errors=["calc_sign_error", "concept_condition_unclear", "read_miss_condition"],
     ),
     KnowledgeNode(
         id="6a_fangcheng_yy",
@@ -812,6 +823,68 @@ def get_node(node_id: str) -> KnowledgeNode | None:
 
 def all_nodes() -> list[KnowledgeNode]:
     return NODES
+
+
+# E2：掌握度判定标准兜底生成（未显式配置时按节点属性生成）
+_DEFAULT_CRITERIA_TEMPLATES: dict[str, list[str]] = {
+    "algebra": [
+        "能正确识别涉及「{name}」的题目并说出考察的核心关系",
+        "能独立完成含「{name}」的基础题，正确率≥80%",
+        "能解释每步变形的依据（不是只会套步骤）",
+        "能将简单应用情境转化为「{name}」的数学表达",
+        "能识别并纠正至少一种与「{name}」相关的典型错误",
+    ],
+    "geometry": [
+        "能画出「{name}」相关图形并正确标注已知条件",
+        "能正确套用「{name}」相关公式/性质，正确率≥80%",
+        "能解释公式/性质为什么成立（推导依据）",
+        "能区分「{name}」的适用条件，不误用",
+        "能解决包含「{name}」的综合几何问题",
+    ],
+    "number_theory": [
+        "能准确说出「{name}」的定义与判定方法",
+        "能熟练运用「{name}」相关运算，正确率≥80%",
+        "能用「{name}」解决实际数论问题",
+        "能识别「{name}」相关概念的区别与联系",
+        "能独立完成拓展题并验证答案合理性",
+    ],
+    "stats": [
+        "能收集并整理与「{name}」相关的数据",
+        "能正确计算「{name}」相关统计量",
+        "能读懂「{name}」相关图表并作出判断",
+        "能解释「{name}」结果的实际含义",
+        "能基于「{name}」数据提出合理决策",
+    ],
+    "general": [
+        "能正确识别涉及「{name}」的题目并说出考察的核心关系",
+        "能独立完成「{name}」的基础题，正确率≥80%",
+        "能解释「{name}」每一步做法为什么这样（不是只会套）",
+        "能解决包含「{name}」的实际问题",
+        "能识别并纠正与「{name}」相关的典型错误",
+    ],
+}
+_DEFAULT_TYPICAL_ERRORS: dict[str, list[str]] = {
+    "algebra": ["calc_sign_error", "concept_condition_unclear", "think_rigid"],
+    "geometry": ["concept_formula_misremember", "read_unit_error", "think_no_decomposition"],
+    "number_theory": ["calc_multiplication_table", "calc_copy_error", "concept_formula_misremember"],
+    "stats": ["read_unit_error", "read_miss_condition", "calc_copy_error"],
+    "general": ["calc_copy_error", "think_no_decomposition", "read_miss_condition"],
+}
+
+
+def mastery_criteria_for(node: KnowledgeNode) -> list[str]:
+    """返回知识点的掌握度判定标准（E2）。显式配置优先，否则按领域生成。"""
+    if node.mastery_criteria:
+        return node.mastery_criteria
+    template = _DEFAULT_CRITERIA_TEMPLATES.get(node.domain, _DEFAULT_CRITERIA_TEMPLATES["general"])
+    return [t.format(name=node.name) for t in template]
+
+
+def typical_errors_for(node: KnowledgeNode) -> list[str]:
+    """返回知识点的典型错误模式 ID（E2）。显式配置优先，否则按领域生成。"""
+    if node.typical_errors:
+        return node.typical_errors
+    return _DEFAULT_TYPICAL_ERRORS.get(node.domain, _DEFAULT_TYPICAL_ERRORS["general"])
 
 
 def prerequisite_chain(node_id: str) -> list[str]:
