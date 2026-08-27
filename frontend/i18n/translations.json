@@ -18,6 +18,7 @@
     "nav.chat": "💬 聊天",
     "nav.knowledge": "🧠 知识脑图",
     "nav.badges": "🏅 成长墙",
+    "nav.cognitive": "🔬 认知画像",
     
     "streak.title": "连续学习天数（保底日也算）",
     "streak.days": "天",
@@ -88,6 +89,7 @@
     "nav.chat": "💬 Chat",
     "nav.knowledge": "🧠 Knowledge Map",
     "nav.badges": "🏅 Growth Wall",
+    "nav.cognitive": "🔬 Cognitive Profile",
     
     "streak.title": "Consecutive learning days (baseline days count)",
     "streak.days": "days",
