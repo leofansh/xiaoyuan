@@ -968,24 +968,3 @@ def node_id_in_own_chain(n: KnowledgeNode) -> bool:
     return False
 
 
-def next_topic_hint(mastery: "dict[str, float]") -> str | None:
-    """推荐下一个学习主题：当前章节内未掌握节点中难度最低者。
-
-    接受两种格式的掌握度映射：{知识点id: float} 或 {知识点id: MasteryRecord}。
-    """
-
-    def _score(nid: str) -> float:
-        val = mastery.get(nid)
-        if isinstance(val, dict):
-            return float(val.get("score", 0.0))
-        return float(val or 0.0)
-
-    candidates = [
-        (n.difficulty, n.id)
-        for n in NODES
-        if _score(n.id) < 0.7
-    ]
-    if not candidates:
-        return None
-    candidates.sort()
-    return candidates[0][1]
