@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>小圆助教 🌸</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐱</text></svg>">
+<link rel="stylesheet" href="/css/style.css?v=15">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+</head>
+<body>
+
+<!-- 档案选择遮罩 -->
+<div id="profile-overlay" class="overlay">
+  <div class="profile-card">
+    <div class="profile-mascot">🐱🌸</div>
+    <h1 data-i18n="profile.title">小圆助教</h1>
+    <p class="subtitle" data-i18n="profile.subtitle">我是你的数学学习伙伴，陪你一块一块把思维积木搭稳～</p>
+    <input id="new-name" type="text" data-i18n-placeholder="profile.namePlaceholder" placeholder="先给自己起个可爱的名字吧" maxlength="12">
+    <button id="btn-create" class="btn-primary" data-i18n="profile.createBtn">开始和小圆学习 ✨</button>
+    <div class="divider"><span data-i18n="profile.orFind">或者在下面找到你</span></div>
+    <div id="existing-students" class="existing-list"></div>
+  </div>
+</div>
+
+<!-- 心情打卡遮罩 -->
+<div id="mood-overlay" class="overlay hidden">
+  <div class="profile-card">
+    <div class="profile-mascot">🐱</div>
+    <h2 data-i18n="mood.title">今天心情怎么样呀？</h2>
+    <p class="subtitle" data-i18n="mood.subtitle">告诉小圆你的状态，好安排最舒服的学法～</p>
+    <div class="mood-row">
+      <button class="mood-btn" data-mood="😊">😊<span data-i18n="mood.happy">心情不错</span></button>
+      <button class="mood-btn" data-mood="😐">😐<span data-i18n="mood.neutral">一般般</span></button>
+      <button class="mood-btn" data-mood="😣">😣<span data-i18n="mood.tired">有点累</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- 主应用 -->
+<div id="app" class="app hidden">
+  <header class="topbar">
+    <div class="logo">🐱 <span data-i18n="app.name">小圆助教</span></div>
+    <nav class="tabs">
+      <button class="tab active" data-view="chat" data-i18n="nav.chat">💬 聊天</button>
+      <button class="tab" data-view="sky" data-i18n="nav.knowledge">🧠 知识脑图</button>
+      <button class="tab" data-view="badges" data-i18n="nav.badges">🏅 成长墙</button>
+      <button class="tab" data-view="cognitive" data-i18n="nav.cognitive">🔬 认知画像</button>
+    </nav>
+    <div class="streak-chip" id="streak-chip" data-i18n-title="streak.title" title="连续学习天数（保底日也算）">🔥 <span id="streak-num">0</span><span data-i18n="streak.days">天</span></div>
+    <button id="btn-settings" data-i18n-title="settings.theme" title="主题装扮">🎨</button>
+    <button id="btn-logout" data-i18n-title="logout.title" title="退出登录">🚪</button>
+  </header>
+
+  <!-- 视图1：聊天 -->
+  <main id="view-chat" class="view active">
+    <div id="chat-scroll" class="chat-scroll"></div>
+    <!-- V-P0-3：模式快捷栏（开场后显示，点选或打字均可），不再强制弹窗 -->
+    <div id="mode-quick-bar" class="mode-quick-bar hidden">
+      <span class="mode-quick-hint">今天想怎么学？打几个字告诉我也行哦～</span>
+      <button class="mode-quick-btn" data-mode="A">🌟 深入探索</button>
+      <button class="mode-quick-btn" data-mode="B">🛡 快速过一遍</button>
+      <button class="mode-quick-btn" data-mode="weekend">🧹 周末修复</button>
+    </div>
+    <!-- 模式选择弹窗（保留为备选，一般不主动弹出） -->
+    <div id="mode-modal" class="mode-modal hidden">
+      <div class="mode-modal-content">
+        <h3 data-i18n="mode.title">🎒 选一种今天学法</h3>
+        <div class="mode-modal-btns">
+          <button class="mode-btn-modal" data-mode="A" data-i18n="mode.deep">🌟 深度成长</button>
+          <button class="mode-btn-modal" data-mode="B" data-i18n="mode.baseline">🛡 保底维稳</button>
+          <button class="mode-btn-modal" data-mode="weekend" data-i18n="mode.weekend">🧹 周末修复</button>
+        </div>
+      </div>
+    </div>
+    <div class="input-area">
+      <div class="input-row">
+        <button id="btn-plus" class="btn-plus" data-i18n-title="input.add" title="添加">＋</button>
+        <div id="plus-menu" class="plus-menu hidden">
+          <button id="btn-photo" data-i18n="input.photo">📷 图片</button>
+        </div>
+        <input id="chat-input" type="text" data-i18n-placeholder="input.placeholder" placeholder="和小圆说点什么…" maxlength="500" autocomplete="off">
+        <button id="btn-voice" class="btn-voice" title="语音输入" aria-label="语音输入">🎤</button>
+      </div>
+    </div>
+    <input id="photo-input" type="file" accept="image/*" capture="environment" hidden>
+    <div class="status-bar">
+      <span id="status-topic" data-i18n="status.topic">📌 今天聚焦：待会儿选</span>
+      <span id="status-time" data-i18n="status.time">⏱ 0分钟</span>
+      <span id="status-confidence">💪 --</span>
+      <span id="thinking-model-tag" class="thinking-model-tag hidden"></span>
+    </div>
+    <!-- 番茄闹钟悬浮图标（选完模式后显示） -->
+    <div class="pomodoro-float hidden" id="pomodoro-float">
+      <svg class="pomodoro-ring" viewBox="0 0 40 40">
+        <circle class="pomodoro-ring-bg" cx="20" cy="20" r="18"/>
+        <circle class="pomodoro-ring-fg" id="pomodoro-ring-fg" cx="20" cy="20" r="18"/>
+      </svg>
+      <span class="pomodoro-text" id="pomodoro-text">25:00</span>
+      <span class="pomodoro-label" id="pomodoro-label" data-i18n="pomodoro.study">学</span>
+    </div>
+  </main>
+
+  <!-- 视图2：知识脑图 -->
+  <main id="view-sky" class="view">
+    <div id="mindmap-container" class="mindmap-container">
+      <div id="mindmap" class="mindmap"></div>
+    </div>
+    <div id="topic-detail" class="topic-detail hidden">
+      <button class="close-x" onclick="hideTopicDetail()">×</button>
+      <h3 id="td-title"></h3>
+      <div id="td-body"></div>
+    </div>
+    <div class="mindmap-legend">
+      <span class="legend-item"><span class="legend-dot" style="background:#4caf50"></span> <span data-i18n="knowledge.mastered">已掌握</span></span>
+      <span class="legend-item"><span class="legend-dot" style="background:#ffc107"></span> <span data-i18n="knowledge.learning">学习中</span></span>
+      <span class="legend-item"><span class="legend-dot" style="background:#f44336"></span> <span data-i18n="knowledge.hasGap">有漏洞</span></span>
+      <span class="legend-item"><span class="legend-dot" style="background:#e0e0e0"></span> <span data-i18n="knowledge.notLearned">还没学</span></span>
+    </div>
+  </main>
+
+  <!-- 视图3：成长徽章墙 -->
+  <main id="view-badges" class="view">
+    <div class="badge-stats">
+      <div class="stat-card"><div class="stat-num" id="stat-sessions">0</div><div class="stat-label" data-i18n="stats.sessions">一起学了几次</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-gaps">0</div><div class="stat-label" data-i18n="stats.gaps">待修复漏洞</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-mastery">--</div><div class="stat-label" data-i18n="stats.mastery">平均掌握度</div></div>
+    </div>
+    <h3 class="section-title" data-i18n="badges.title">📈 我的信心曲线（只和自己比）</h3>
+    <canvas id="confidence-chart" height="120"></canvas>
+    <h3 class="section-title" data-i18n="badges.myBadges">🏅 我的徽章</h3>
+    <div id="badge-grid" class="badge-grid"></div>
+    <div id="gap-list-wrap">
+      <h3 class="section-title" data-i18n="badges.gaps">🔍 待修复的漏洞（修好一个亮一颗星）</h3>
+      <ul id="gap-list" class="gap-list"></ul>
+    </div>
+    <h3 class="section-title" data-i18n="badges.history">📖 学习记录</h3>
+    <div id="history-list" class="history-list"></div>
+  </main>
+
+  <!-- 视图4：认知画像 -->
+  <main id="view-cognitive" class="view">
+    <div id="cognitive-content" class="cognitive-content">
+      <div id="cognitive-empty" class="cognitive-empty">
+        <div class="cognitive-empty-icon">🔬</div>
+        <h3>还没有认知画像</h3>
+        <p>完成一次入学诊断（约5-10分钟），小圆就能了解你的认知风格，用最适合你的方式陪你学～</p>
+        <button id="btn-start-assessment" class="btn-primary">开始认知诊断 ✨</button>
+      </div>
+      <div id="cognitive-profile" class="cognitive-profile hidden">
+        <h3 class="section-title">🧠 我的认知画像</h3>
+        <canvas id="cognitive-radar" width="300" height="300"></canvas>
+        <div id="cognitive-details" class="cognitive-details"></div>
+        <h3 class="section-title">📊 分领域认知水平</h3>
+        <div id="domain-bars" class="domain-bars"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- 主题设置面板 -->
+<div id="settings-overlay" class="settings-overlay hidden">
+  <div class="settings-card">
+    <div class="profile-mascot">🎨</div>
+    <h2 data-i18n="settings.title">设置</h2>
+    <p class="subtitle" data-i18n="settings.themeSubtitle">挑一个最喜欢的颜色吧～</p>
+    <div id="theme-grid" class="theme-grid"></div>
+    <h3 class="section-title" style="text-align:left;margin:16px 0 8px" data-i18n="settings.apiTitle">🔑 API Key</h3>
+    <p class="subtitle" style="text-align:left;margin:0 0 8px" data-i18n="settings.apiSubtitle">填入你自己的 DeepSeek API Key，保存后立即生效。</p>
+    <div class="apikey-row">
+      <input id="apikey-input" type="password" placeholder="sk-xxxxxxxxxxxxxxxx" autocomplete="off">
+      <button id="btn-apikey-save" class="btn-primary" style="width:auto;padding:8px 18px" data-i18n="settings.save">保存</button>
+    </div>
+    <div id="apikey-status" class="apikey-status"></div>
+    <h3 class="section-title" style="text-align:left;margin:16px 0 8px" data-i18n="settings.lang">🌐 语言</h3>
+    <div class="lang-row">
+      <button class="lang-btn active" data-lang="zh" data-i18n="settings.langZh">中文</button>
+      <button class="lang-btn" data-lang="en" data-i18n="settings.langEn">English</button>
+    </div>
+    <button id="btn-settings-close" class="btn-primary" style="margin-top:16px" data-i18n="settings.close">就用这个啦 ✨</button>
+  </div>
+</div>
+
+<!-- 学习记录详情弹窗 -->
+<div id="history-overlay" class="history-overlay hidden">
+  <div class="history-detail-card">
+    <div class="history-detail-head">
+      <div>
+        <h3 id="hd-title"></h3>
+        <div id="hd-meta" class="history-meta"></div>
+      </div>
+      <button class="close-x" onclick="closeHistoryDetail()">×</button>
+    </div>
+    <div id="hd-messages" class="history-messages"></div>
+    <div id="hd-spots" class="history-spots-detail hidden"></div>
+  </div>
+</div>
+
+<!-- 庆祝动效层 -->
+<canvas id="celebrate-canvas" class="celebrate-layer"></canvas>
+
+<!-- Toast -->
+<div id="toast" class="toast hidden"></div>
+
+<script src="/js/i18n.js"></script>
+<script src="/js/math.js?v=1"></script>
+<script src="/js/app.js?v=16"></script>
+</body>
+</html>

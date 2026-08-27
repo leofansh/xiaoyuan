@@ -1,0 +1,457 @@
+{
+  "passed": 47,
+  "failed": 3,
+  "total": 50,
+  "results": [
+    {
+      "id": "A01",
+      "topic": "有理数运算",
+      "domain": "代数",
+      "question": "计算：(-3) + 7 - (-5)",
+      "answer": "9",
+      "passed": true,
+      "detail": "答案含 9，期望 9.0"
+    },
+    {
+      "id": "A02",
+      "topic": "有理数运算",
+      "domain": "代数",
+      "question": "计算：(-2) × (-5) ÷ (-2)",
+      "answer": "-5",
+      "passed": true,
+      "detail": "答案含 -5，期望 -5.0"
+    },
+    {
+      "id": "A03",
+      "topic": "有理数混合运算",
+      "domain": "代数",
+      "question": "计算：(-2)^2 - 3 × 2 + 1",
+      "answer": "-1",
+      "passed": true,
+      "detail": "答案含 -1，期望 -1.0"
+    },
+    {
+      "id": "A04",
+      "topic": "有理数混合运算",
+      "domain": "代数",
+      "question": "计算：(-1)^3 × 2 + (-3)^2",
+      "answer": "-2 + 9 = 7",
+      "passed": true,
+      "detail": "答案含 7，期望 7.0"
+    },
+    {
+      "id": "A05",
+      "topic": "绝对值",
+      "domain": "代数",
+      "question": "如果 |x| = 5，那么 x 的值是多少？",
+      "answer": "x=5 或 x=-5",
+      "passed": true,
+      "detail": "回答包含 5"
+    },
+    {
+      "id": "E01",
+      "topic": "一元一次方程解法",
+      "domain": "代数",
+      "question": "解方程：3x + 7 = 22",
+      "answer": "x=5",
+      "passed": true,
+      "detail": "回答数字接近 5"
+    },
+    {
+      "id": "E02",
+      "topic": "一元一次方程解法",
+      "domain": "代数",
+      "question": "解方程：2(x - 3) = 8",
+      "answer": "x=7",
+      "passed": true,
+      "detail": "回答数字接近 7"
+    },
+    {
+      "id": "E03",
+      "topic": "一元一次方程解法",
+      "domain": "代数",
+      "question": "解方程：5x - 4 = 3x + 8",
+      "answer": "x=6",
+      "passed": true,
+      "detail": "回答数字接近 6"
+    },
+    {
+      "id": "E04",
+      "topic": "一元一次方程解法",
+      "domain": "代数",
+      "question": "解方程：(x+1)/2 = 3",
+      "answer": "x=5",
+      "passed": true,
+      "detail": "回答数字接近 5"
+    },
+    {
+      "id": "E05",
+      "topic": "一元一次方程解法",
+      "domain": "代数",
+      "question": "解方程：4(x - 1) + 2x = 20",
+      "answer": "x=4",
+      "passed": true,
+      "detail": "回答数字接近 4"
+    },
+    {
+      "id": "AP01",
+      "topic": "一元一次方程应用",
+      "domain": "代数",
+      "question": "小明有一些铅笔，给了同学 6 支后还剩 14 支，原来有多少支？",
+      "answer": "20",
+      "passed": true,
+      "detail": "回答数字接近 20"
+    },
+    {
+      "id": "AP02",
+      "topic": "一元一次方程应用",
+      "domain": "代数",
+      "question": "一个数的 3 倍减去 5 等于 16，这个数是多少？",
+      "answer": "7",
+      "passed": true,
+      "detail": "回答数字接近 7"
+    },
+    {
+      "id": "AP03",
+      "topic": "一元一次方程应用",
+      "domain": "代数",
+      "question": "甲、乙两人一共做了 30 本书，甲做得比乙的 2 倍少 3 本，乙做了多少本？",
+      "answer": "11",
+      "passed": true,
+      "detail": "回答数字接近 11"
+    },
+    {
+      "id": "N01",
+      "topic": "数轴",
+      "domain": "代数",
+      "question": "在数轴上，表示 -3 的点和表示 5 的点之间的距离是多少？",
+      "answer": "8",
+      "passed": true,
+      "detail": "答案含 8，期望 8.0"
+    },
+    {
+      "id": "N02",
+      "topic": "绝对值",
+      "domain": "代数",
+      "question": "满足 |x - 2| = 3 的 x 值是什么？",
+      "answer": "x=-1, x=5",
+      "passed": true,
+      "detail": "回答包含 5"
+    },
+    {
+      "id": "R01",
+      "topic": "有理数应用",
+      "domain": "代数",
+      "question": "池塘水位第一天上升了 2 厘米，第二天下降了 5 厘米，第三天上升了 3 厘米，三天后水位比原来高了多少厘米？",
+      "answer": "0",
+      "passed": true,
+      "detail": "答案含 0，期望 0.0"
+    },
+    {
+      "id": "R02",
+      "topic": "有理数应用",
+      "domain": "代数",
+      "question": "温度从 -8℃ 升到 12℃，升高了多少度？",
+      "answer": "20",
+      "passed": true,
+      "detail": "答案含 20，期望 20.0"
+    },
+    {
+      "id": "P01",
+      "topic": "幂运算",
+      "domain": "代数",
+      "question": "计算：2^3 × 2^2",
+      "answer": "32",
+      "passed": true,
+      "detail": "答案含 32，期望 32.0"
+    },
+    {
+      "id": "P02",
+      "topic": "幂运算",
+      "domain": "代数",
+      "question": "计算：(2^2)^3",
+      "answer": "8",
+      "passed": false,
+      "detail": "回答 8... 中无数字接近期望 64.0。提取数字: ['8']"
+    },
+    {
+      "id": "S01",
+      "topic": "二元一次方程组",
+      "domain": "代数",
+      "question": "解方程组：x + y = 10, x - y = 4。求 x 和 y。",
+      "answer": "x=7, y=3",
+      "passed": true,
+      "detail": "回答包含解 x=7, y=3"
+    },
+    {
+      "id": "S02",
+      "topic": "二元一次方程组",
+      "domain": "代数",
+      "question": "解方程组：2x + y = 11, x - y = 1。求 x 和 y。",
+      "answer": "x=4, y=3",
+      "passed": true,
+      "detail": "回答包含解 x=4, y=3"
+    },
+    {
+      "id": "S03",
+      "topic": "二元一次方程组",
+      "domain": "代数",
+      "question": "解方程组：x + 2y = 8, 2x + y = 7。求 x 和 y。",
+      "answer": "x=2, y=3",
+      "passed": true,
+      "detail": "回答包含解 x=2, y=3"
+    },
+    {
+      "id": "I01",
+      "topic": "不等式",
+      "domain": "代数",
+      "question": "解不等式：x + 3 > 7",
+      "answer": "x > 4",
+      "passed": true,
+      "detail": "回答含不等式符号: x > 4"
+    },
+    {
+      "id": "I02",
+      "topic": "不等式",
+      "domain": "代数",
+      "question": "解不等式：2x - 1 < 9",
+      "answer": "x < 5",
+      "passed": true,
+      "detail": "回答含不等式符号: x < 5"
+    },
+    {
+      "id": "G01",
+      "topic": "几何基础",
+      "domain": "几何",
+      "question": "一个长方形的长是 8 厘米，宽是 5 厘米，它的周长是多少厘米？",
+      "answer": "26",
+      "passed": true,
+      "detail": "答案含 26，期望 26.0"
+    },
+    {
+      "id": "G02",
+      "topic": "几何基础",
+      "domain": "几何",
+      "question": "一个正方形的边长是 6 厘米，它的面积是多少平方厘米？",
+      "answer": "36",
+      "passed": true,
+      "detail": "答案含 36，期望 36.0"
+    },
+    {
+      "id": "G03",
+      "topic": "几何基础",
+      "domain": "几何",
+      "question": "一个三角形的底是 10 厘米，高是 6 厘米，它的面积是多少平方厘米？",
+      "answer": "30",
+      "passed": true,
+      "detail": "答案含 30，期望 30.0"
+    },
+    {
+      "id": "G04",
+      "topic": "几何基础",
+      "domain": "几何",
+      "question": "一个圆的半径是 3 厘米（π取3.14），它的周长是多少厘米？",
+      "answer": "18.84",
+      "passed": true,
+      "detail": "答案含 18.84，期望 18.84"
+    },
+    {
+      "id": "G05",
+      "topic": "几何基础",
+      "domain": "几何",
+      "question": "一个长方体的长宽高分别是 3、2、1 厘米，它的体积是多少立方厘米？",
+      "answer": "6",
+      "passed": true,
+      "detail": "答案含 6，期望 6.0"
+    },
+    {
+      "id": "G06",
+      "topic": "角度计算",
+      "domain": "几何",
+      "question": "三角形三个内角分别是 x°、70°、50°，求 x。",
+      "answer": "x=60",
+      "passed": true,
+      "detail": "回答数字接近 60"
+    },
+    {
+      "id": "G07",
+      "topic": "角度计算",
+      "domain": "几何",
+      "question": "一个直角三角形的两个锐角中一个角是 35°，另一个角是多少度？",
+      "answer": "55",
+      "passed": true,
+      "detail": "回答数字接近 55"
+    },
+    {
+      "id": "G08",
+      "topic": "角度计算",
+      "domain": "几何",
+      "question": "一个等腰三角形的顶角是 80°，它的一个底角是多少度？",
+      "answer": "50",
+      "passed": true,
+      "detail": "答案含 50，期望 50.0"
+    },
+    {
+      "id": "PR01",
+      "topic": "比例与百分数",
+      "domain": "代数",
+      "question": "一件商品原价 200 元，打八折出售，现价是多少元？",
+      "answer": "160",
+      "passed": true,
+      "detail": "答案含 160，期望 160.0"
+    },
+    {
+      "id": "PR02",
+      "topic": "比例与百分数",
+      "domain": "代数",
+      "question": "一个班有 50 人，其中 40% 是女生，男生有多少人？",
+      "answer": "30",
+      "passed": true,
+      "detail": "答案含 30，期望 30.0"
+    },
+    {
+      "id": "PR03",
+      "topic": "比例与百分数",
+      "domain": "代数",
+      "question": "小明有 30 颗糖，分给妹妹 20%，自己还剩多少颗？",
+      "answer": "24",
+      "passed": true,
+      "detail": "答案含 24，期望 24.0"
+    },
+    {
+      "id": "V01",
+      "topic": "行程问题",
+      "domain": "代数",
+      "question": "一辆汽车 2 小时行驶了 120 千米，平均速度是多少千米/小时？",
+      "answer": "60",
+      "passed": true,
+      "detail": "答案含 60，期望 60.0"
+    },
+    {
+      "id": "V02",
+      "topic": "行程问题",
+      "domain": "代数",
+      "question": "小明跑步速度为 5 米/秒，跑了 100 米，用了多少秒？",
+      "answer": "20",
+      "passed": true,
+      "detail": "答案含 20，期望 20.0"
+    },
+    {
+      "id": "V3D01",
+      "topic": "体积计算",
+      "domain": "几何",
+      "question": "一个圆柱的底面积是 20 平方厘米，高是 5 厘米，体积是多少立方厘米？",
+      "answer": "100",
+      "passed": true,
+      "detail": "答案含 100，期望 100.0"
+    },
+    {
+      "id": "V3D02",
+      "topic": "体积计算",
+      "domain": "几何",
+      "question": "一个圆锥的底面积是 12 平方厘米，高是 9 厘米，体积是多少立方厘米？",
+      "answer": "36",
+      "passed": true,
+      "detail": "答案含 36，期望 36.0"
+    },
+    {
+      "id": "ST01",
+      "topic": "统计基础",
+      "domain": "统计",
+      "question": "一组数据 2, 3, 5, 7, 8，这组数据的平均数是多少？",
+      "answer": "5",
+      "passed": true,
+      "detail": "答案含 5，期望 5.0"
+    },
+    {
+      "id": "ST02",
+      "topic": "统计基础",
+      "domain": "统计",
+      "question": "一组数据 1, 2, 2, 3, 4, 4, 4，这组数据的众数是多少？",
+      "answer": "4",
+      "passed": true,
+      "detail": "回答包含 4"
+    },
+    {
+      "id": "ST03",
+      "topic": "统计基础",
+      "domain": "统计",
+      "question": "一组数据 3, 5, 6, 8, 9 的中位数是多少？",
+      "answer": "6",
+      "passed": true,
+      "detail": "回答包含 6"
+    },
+    {
+      "id": "TH01",
+      "topic": "因数与倍数",
+      "domain": "数论",
+      "question": "12 有几个因数？",
+      "answer": "12",
+      "passed": false,
+      "detail": "回答 12... 未包含期望值 ['6']"
+    },
+    {
+      "id": "TH02",
+      "topic": "因数与倍数",
+      "domain": "数论",
+      "question": "18 和 24 的最大公因数是多少？",
+      "answer": "6",
+      "passed": true,
+      "detail": "回答包含 6"
+    },
+    {
+      "id": "TH03",
+      "topic": "因数与倍数",
+      "domain": "数论",
+      "question": "6 和 8 的最小公倍数是多少？",
+      "answer": "24",
+      "passed": true,
+      "detail": "回答包含 24"
+    },
+    {
+      "id": "C01",
+      "topic": "综合应用",
+      "domain": "代数",
+      "question": "班级订购了 45 本练习本，每本 2 元，有 3 本破损退回，实际应付多少钱？",
+      "answer": "84",
+      "passed": true,
+      "detail": "答案含 84，期望 84.0"
+    },
+    {
+      "id": "C02",
+      "topic": "综合应用",
+      "domain": "代数",
+      "question": "食堂买来 50 千克大米，每天吃 2 千克，吃了 15 天后还剩多少千克？",
+      "answer": "20",
+      "passed": true,
+      "detail": "答案含 20，期望 20.0"
+    },
+    {
+      "id": "C03",
+      "topic": "综合应用",
+      "domain": "代数",
+      "question": "一个班有男生 24 人，女生比男生的 2 倍少 10 人，女生有多少人？",
+      "answer": "38",
+      "passed": true,
+      "detail": "答案含 38，期望 38.0"
+    },
+    {
+      "id": "C04",
+      "topic": "综合应用",
+      "domain": "代数",
+      "question": "有一根绳子，第一次用去 15 米，第二次用去剩下的 1/3，一共用去 25 米，这根绳子原来多长？",
+      "answer": "30",
+      "passed": false,
+      "detail": "回答 30... 未给出 x=45。提取数字: ['30']，方程解参考: [45]"
+    },
+    {
+      "id": "C05",
+      "topic": "综合应用",
+      "domain": "代数",
+      "question": "甲乙两人从相距 120 千米的两地相向而行，甲速度 40 千米/时，乙速度 20 千米/时，几小时后相遇？",
+      "answer": "2小时",
+      "passed": true,
+      "detail": "回答数字接近 2"
+    }
+  ]
+}

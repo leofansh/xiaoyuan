@@ -1,0 +1,141 @@
+{
+  "zh": {
+    "app.title": "小圆助教 🌸",
+    "app.name": "小圆助教",
+    
+    "profile.title": "小圆助教",
+    "profile.subtitle": "我是你的数学学习伙伴，陪你一块一块把思维积木搭稳～",
+    "profile.namePlaceholder": "先给自己起个可爱的名字吧",
+    "profile.createBtn": "开始和小圆学习 ✨",
+    "profile.orFind": "或者在下面找到你",
+    
+    "mood.title": "今天心情怎么样呀？",
+    "mood.subtitle": "告诉小圆你的状态，好安排最舒服的学法～",
+    "mood.happy": "心情不错",
+    "mood.neutral": "一般般",
+    "mood.tired": "有点累",
+    
+    "nav.chat": "💬 聊天",
+    "nav.knowledge": "🧠 知识脑图",
+    "nav.badges": "🏅 成长墙",
+    
+    "streak.title": "连续学习天数（保底日也算）",
+    "streak.days": "天",
+    
+    "settings.theme": "🎨 主题装扮",
+    "logout.title": "退出登录",
+    
+    "learn.startBtn": "📝 开始学习",
+    
+    "mode.title": "🎒 选一种今天学法",
+    "mode.deep": "🌟 深度成长",
+    "mode.baseline": "🛡 保底维稳",
+    "mode.weekend": "🧹 周末修复",
+    
+    "input.add": "添加",
+    "input.photo": "📷 图片",
+    "input.placeholder": "和小圆说点什么…",
+    
+    "status.topic": "📌 今天聚焦：待会儿选",
+    "status.time": "⏱ 0分钟",
+    "status.confidence": "💪 --",
+    
+    "pomodoro.study": "学",
+    "pomodoro.rest": "息",
+    
+    "knowledge.mastered": "已掌握",
+    "knowledge.learning": "学习中",
+    "knowledge.hasGap": "有漏洞",
+    "knowledge.notLearned": "还没学",
+    
+    "stats.sessions": "一起学了几次",
+    "stats.gaps": "待修复漏洞",
+    "stats.mastery": "平均掌握度",
+    
+    "badges.title": "📈 我的信心曲线（只和自己比）",
+    "badges.myBadges": "🏅 我的徽章",
+    "badges.gaps": "🔍 待修复的漏洞（修好一个亮一颗星）",
+    "badges.history": "📖 学习记录",
+    
+    "settings.title": "设置",
+    "settings.themeSubtitle": "挑一个最喜欢的颜色吧～",
+    "settings.apiTitle": "🔑 API Key",
+    "settings.apiSubtitle": "填入你自己的 DeepSeek API Key，保存后立即生效。",
+    "settings.save": "保存",
+    "settings.close": "就用这个啦 ✨",
+    
+    "settings.lang": "🌐 语言",
+    "settings.langZh": "中文",
+    "settings.langEn": "English"
+  },
+  
+  "en": {
+    "app.title": "Xiaoyuan Tutor 🌸",
+    "app.name": "Xiaoyuan Tutor",
+    
+    "profile.title": "Xiaoyuan Tutor",
+    "profile.subtitle": "I'm your math learning partner, helping you build thinking skills step by step~",
+    "profile.namePlaceholder": "Give yourself a cute name first",
+    "profile.createBtn": "Start Learning with Xiaoyuan ✨",
+    "profile.orFind": "Or find yourself below",
+    
+    "mood.title": "How are you feeling today?",
+    "mood.subtitle": "Tell Xiaoyuan your state, so she can arrange the most comfortable way to learn~",
+    "mood.happy": "Feeling good",
+    "mood.neutral": "So-so",
+    "mood.tired": "A bit tired",
+    
+    "nav.chat": "💬 Chat",
+    "nav.knowledge": "🧠 Knowledge Map",
+    "nav.badges": "🏅 Growth Wall",
+    
+    "streak.title": "Consecutive learning days (baseline days count)",
+    "streak.days": "days",
+    
+    "settings.theme": "🎨 Theme",
+    "logout.title": "Logout",
+    
+    "learn.startBtn": "📝 Start Learning",
+    
+    "mode.title": "🎒 Choose today's mode",
+    "mode.deep": "🌟 Deep Growth",
+    "mode.baseline": "🛡 Baseline",
+    "mode.weekend": "🧹 Weekend Repair",
+    
+    "input.add": "Add",
+    "input.photo": "📷 Photo",
+    "input.placeholder": "Say something to Xiaoyuan...",
+    
+    "status.topic": "📌 Today's Focus: Choose later",
+    "status.time": "⏱ 0 min",
+    "status.confidence": "💪 --",
+    
+    "pomodoro.study": "Study",
+    "pomodoro.rest": "Rest",
+    
+    "knowledge.mastered": "Mastered",
+    "knowledge.learning": "Learning",
+    "knowledge.hasGap": "Has Gap",
+    "knowledge.notLearned": "Not Yet",
+    
+    "stats.sessions": "Sessions Together",
+    "stats.gaps": "Gaps to Fix",
+    "stats.mastery": "Avg Mastery",
+    
+    "badges.title": "📈 My Confidence Curve (Only compare with yourself)",
+    "badges.myBadges": "🏅 My Badges",
+    "badges.gaps": "🔍 Gaps to Fix (Fix one to light up a star)",
+    "badges.history": "📖 Learning History",
+    
+    "settings.title": "Settings",
+    "settings.themeSubtitle": "Pick your favorite color~",
+    "settings.apiTitle": "🔑 API Key",
+    "settings.apiSubtitle": "Enter your DeepSeek API Key. Takes effect immediately after saving.",
+    "settings.save": "Save",
+    "settings.close": "Use This ✨",
+    
+    "settings.lang": "🌐 Language",
+    "settings.langZh": "中文",
+    "settings.langEn": "English"
+  }
+}
