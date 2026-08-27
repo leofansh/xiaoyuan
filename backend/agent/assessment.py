@@ -55,26 +55,54 @@ def apply_eval(student: Student, eval_data: dict) -> list[str]:
         student.mastery[topic_id] = new_rec
 
     # 2. 新漏洞
+    # 2. 新漏洞（B2：精细分类 + 根因 + 修复策略 + 复发追踪）
+    from backend.knowledge.error_patterns import category_name, classify_gap, repair_strategy_for
+
     for gap in eval_data.get("gaps_found") or []:
         topic_id = gap.get("topic_id", "")
-        if not topic_id or any(g.topic_id == topic_id and g.status == "open" for g in student.gaps):
+        if not topic_id:
             continue
         node = syllabus.get_node(topic_id)
+        evidence = str(gap.get("evidence", ""))[:200]
+        gap_type = "concept" if gap.get("type") != "careless" else "careless"
+        category = classify_gap(topic_id, gap_type, evidence, gap.get("error_pattern", ""))
+        now = student.today_iso()
+
+        # 已有 open 漏洞：同一知识点复发 → 计数+1，升级为 recurring
+        existing_open = [g for g in student.gaps if g.topic_id == topic_id and g.status == "open"]
+        if existing_open:
+            g = existing_open[0]
+            g.occurrence_count += 1
+            g.last_occurred = now
+            if g.occurrence_count >= 2:
+                g.status = "recurring"
+            if not g.root_cause and category != "unknown":
+                g.category = category
+                g.root_cause = f"再次出现，判定为{category_name(category)}"
+                g.repair_strategy = repair_strategy_for(category, evidence)
+            continue
+
         student.gaps.append(
             Gap(
                 topic_id=topic_id,
                 topic_name=gap.get("topic_name") or (node.name if node else topic_id),
-                type="concept" if gap.get("type") != "careless" else "careless",
-                evidence=str(gap.get("evidence", ""))[:200],
+                type=gap_type,
+                category=category,
+                root_cause=gap.get("root_cause") or (f"初步判定为{category_name(category)}" if category != "unknown" else ""),
+                repair_strategy=repair_strategy_for(category, evidence),
+                evidence=evidence,
                 status="open",
-                found_at=student.today_iso(),
+                first_detected=now,
+                last_occurred=now,
+                occurrence_count=1,
+                found_at=now,
             )
         )
 
-    # 3. 漏洞清零
+    # 3. 漏洞清零（含 recurring 复发漏洞）
     for topic_id in eval_data.get("gaps_cleared") or []:
         for g in student.gaps:
-            if g.topic_id == topic_id and g.status == "open":
+            if g.topic_id == topic_id and g.status in ("open", "recurring"):
                 g.status = "cleared"
                 g.cleared_at = student.today_iso()
                 rec = student.mastery.get(topic_id)
@@ -148,6 +176,28 @@ def apply_eval(student: Student, eval_data: dict) -> list[str]:
         student.current_session.history,
     )
     update_cognitive_profile(student, eval_data, features)
+
+    # 5g. B3：日常交互持续更新认知画像（贝叶斯加权，新证据优先）
+    from backend.agent.cognitive_assessment import update_cognitive_from_interaction
+
+    _interaction_evidence: dict = {"source": "daily"}
+    if features.get("asked_why"):
+        _interaction_evidence["abstract_thinking_evidence"] = 0.65
+        _interaction_evidence["metacognition_evidence"] = 0.6
+    if features.get("self_corrected") or features.get("stated_blind_spot"):
+        _interaction_evidence["metacognition_evidence"] = 0.55
+    if features.get("tried_alternative_method"):
+        _interaction_evidence["flexibility_evidence"] = 0.7
+    if features.get("frequent_step_questions"):
+        _interaction_evidence["working_memory_evidence"] = 0.2
+    if features.get("careless_errors_frequent"):
+        _interaction_evidence["working_memory_evidence"] = 0.3
+    if features.get("avoidance_behavior"):
+        _interaction_evidence["math_anxiety_evidence"] = 0.75
+    if features.get("主动挑战难题"):
+        _interaction_evidence["math_anxiety_evidence"] = 0.15
+    if len(_interaction_evidence) > 1:  # 至少有证据可更新
+        update_cognitive_from_interaction(student, _interaction_evidence)
 
     # 6. 状态机推进（确定性规则 + LLM 建议 + 合法性校验，架构优化 A1）
     from backend.agent.state_engine import decide_next_state, update_consecutive_counts

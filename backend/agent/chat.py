@@ -20,8 +20,10 @@ from backend.services.storage import StudentStorage, get_storage
 
 def start_session(student: Student, mood: str) -> dict:
     """开始新会话：记录心情，生成开场白与模式建议。"""
-    # 会话开始时先应用遗忘衰减
+    # 会话开始时先应用遗忘衰减 + 认知画像衰减（B3）
     assessment.apply_forgetting_decay(student)
+    from backend.agent.cognitive_assessment import apply_cognitive_decay
+    apply_cognitive_decay(student)
 
     sess = student.current_session
     sess.state = "MODE_SELECT"
@@ -246,6 +248,32 @@ async def process_message(
             f"先共情，然后温柔建议：'{strategy_prompt}'，"
             f"让她主动尝试，而不是直接告诉她怎么做]"
         )
+
+    # C1：教学策略引擎（确定性选择，LLM 按步骤执行）
+    from backend.agent.strategy_engine import infer_problem_type, select_strategy, strategy_instruction
+    from backend.knowledge import syllabus as _syl_strategy
+
+    _topic_node = _syl_strategy.get_node(sess.topic_id) if sess.topic_id else None
+    _ptype = infer_problem_type(
+        topic_name=_topic_node.name if _topic_node else "",
+        user_message=user_message or "",
+    )
+    _self_doubt = bool(user_message and any(
+        k in user_message for k in ["我太笨", "我学不会", "我不行", "我笨", "好难我不会"]
+    ))
+    _strategy = select_strategy(
+        student,
+        problem_type=_ptype,
+        context={
+            "consecutive_wrong": sess.consecutive_wrong,
+            "consecutive_correct": sess.consecutive_correct,
+            "mastery": student.mastery_score(sess.topic_id) if sess.topic_id else 0.5,
+            "step_count": 4 if _ptype in ("word_problem", "multi_step") else 1,
+            "self_doubt_expression": _self_doubt,
+        },
+    )
+    if _strategy:
+        extras.append(f"[教学策略指令]\n{strategy_instruction(_strategy)}")
 
     extra_instruction = "\n".join(extras)
     if extra_instruction:

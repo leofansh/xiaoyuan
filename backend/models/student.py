@@ -8,8 +8,15 @@ class Gap(BaseModel):
     topic_id: str
     topic_name: str = ""
     type: Literal["concept", "careless"] = "concept"
+    # B2：精细分类
+    category: str = "unknown"        # 见 GAP_CATEGORIES（error_patterns.py）
+    root_cause: str = ""             # 根因描述
+    repair_strategy: str = ""        # 修复策略
     evidence: str = ""
-    status: Literal["open", "cleared"] = "open"
+    status: Literal["open", "cleared", "recurring"] = "open"
+    first_detected: str = ""
+    last_occurred: str = ""
+    occurrence_count: int = 1
     found_at: str = ""
     cleared_at: str | None = None
 
@@ -100,6 +107,7 @@ class CognitiveProfile(BaseModel):
     # 9. 评估元信息
     assessed_at: str = ""          # 初始评估时间
     last_updated: str = ""         # 动态更新时间
+    last_assessed: str = ""        # 最后评估/更新认知画像时间（B3 衰减依据）
     assessment_confidence: float = 0.0  # 画像置信度（随数据积累提升）
 
 
@@ -177,10 +185,10 @@ class Student(BaseModel):
     current_session: SessionState = Field(default_factory=SessionState)
 
     def open_gaps(self) -> list[Gap]:
-        return [g for g in self.gaps if g.status == "open"]
+        return [g for g in self.gaps if g.status in ("open", "recurring")]
 
     def concept_gaps_open(self) -> list[Gap]:
-        return [g for g in self.gaps if g.status == "open" and g.type == "concept"]
+        return [g for g in self.gaps if g.status in ("open", "recurring") and g.type == "concept"]
 
     def avg_mastery(self) -> float:
         if not self.mastery:
@@ -203,10 +211,11 @@ class Student(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _migrate_legacy_mastery(cls, data: Any) -> Any:
-        """把旧格式 {知识点id: float} 的掌握度迁移为 {知识点id: MasteryRecord}。"""
-        if isinstance(data, dict) and isinstance(data.get("mastery"), dict):
-            mastery = data["mastery"]
-            if mastery and all(isinstance(v, (int, float)) for v in mastery.values()):
+        """把旧格式数据迁移为新格式（B1 掌握度 + B2 漏洞分类）。"""
+        if isinstance(data, dict):
+            # B1：mastery {tid: float} → {tid: MasteryRecord}
+            mastery = data.get("mastery")
+            if isinstance(mastery, dict) and mastery and all(isinstance(v, (int, float)) for v in mastery.values()):
                 today = date.today().isoformat()
                 data["mastery"] = {
                     tid: {
@@ -218,6 +227,19 @@ class Student(BaseModel):
                     }
                     for tid, v in mastery.items()
                 }
+            # B2：旧 Gap 补全 category/root_cause/repair_strategy
+            gaps = data.get("gaps")
+            if isinstance(gaps, list):
+                legacy_map = {"concept": "concept_misunderstanding", "careless": "careless_general"}
+                for g in gaps:
+                    if isinstance(g, dict) and not g.get("category"):
+                        gtype = g.get("type", "concept")
+                        g["category"] = legacy_map.get(gtype, "unknown")
+                        g.setdefault("root_cause", "")
+                        g.setdefault("repair_strategy", "")
+                        g.setdefault("first_detected", g.get("found_at", ""))
+                        g.setdefault("last_occurred", g.get("found_at", ""))
+                        g.setdefault("occurrence_count", 1)
         return data
 
 

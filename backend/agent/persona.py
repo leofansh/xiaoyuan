@@ -171,7 +171,7 @@ def _thinking_model_hint(student: Student, current_topic_id: str) -> str:
         state=sess.state,
         error_type=sess.last_error_type or None,
         thinking_model_mastery=mastery,
-        learning_preference=student.student_profile.learning_preference,
+        learning_preference=student.cognitive_profile.learning_preference,
         consecutive_wrong=sess.consecutive_wrong,
     )
     if not selected:
@@ -307,6 +307,25 @@ def build_system_prompt(student: Student) -> str:
             "喜欢音乐就用节拍/音符/节奏比喻。"
             "但不要每道题都用，自然地穿插使用，大约3-5轮用一次。"
         )
+
+        # C3：兴趣 → 数学情境（当前知识点匹配时注入具体情境）
+        from backend.services.interest_extractor import get_math_context_for_interest
+
+        topic_name = ""
+        if student.current_session.topic_id:
+            _n = syllabus.get_node(student.current_session.topic_id)
+            if _n:
+                topic_name = _n.name
+        matched_interest = next(
+            (i for i in student.interests if get_math_context_for_interest(i, topic_name)),
+            None,
+        )
+        if matched_interest:
+            context_parts.append(
+                f"- 【兴趣情境】学生喜欢{matched_interest}，"
+                f"当前知识点「{topic_name}」可以用这个情境引入：\n"
+                f"{get_math_context_for_interest(matched_interest, topic_name)}"
+            )
     if student.week_baseline_count >= 4:
         context_parts.append("- ⚠️ 本周全是保底日：请在自然时机温柔建议明天试试小挑战（不批评）")
 

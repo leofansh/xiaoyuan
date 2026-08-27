@@ -253,3 +253,102 @@ def get_assessment_summary(result: AssessmentResult) -> str:
     if result.metacognition_level >= 0.5:
         parts.append("元认知能力不错，能主动反思")
     return "；".join(parts)
+
+
+# ===== B3：认知画像持续更新机制 =====
+from datetime import datetime  # noqa: E402
+
+# 认知画像衰减参数
+COGNITIVE_DECAY_DAYS = 30      # 30天后置信度开始衰减
+COGNITIVE_DECAY_RATE = 0.02    # 每周衰减率
+REASSESS_CONFIDENCE_THRESHOLD = 0.3   # 置信度低于此值建议重新评估
+REASSESS_DAYS = 90             # 超过90天建议重新评估
+
+
+def _weighted_update(old: float, new: float, weight: float) -> float:
+    """加权更新（贝叶斯式：新证据权重更高）。"""
+    return round(max(0.0, min(1.0, old * (1 - weight) + new * weight)), 4)
+
+
+def update_cognitive_from_interaction(student, interaction_data: dict) -> None:
+    """从日常交互中隐式更新认知画像（B3）。
+
+    interaction_data 支持：
+    - abstract_thinking_evidence: 抽象思维证据（0-1）
+    - metacognition_evidence: 元认知证据（0-1）
+    - working_memory_evidence: 工作记忆证据（0-1）
+    - math_anxiety_evidence: 数学焦虑证据（0-1）
+    - flexibility_evidence: 认知灵活性证据（0-1）
+    - source: 证据来源（"diagnostic" / "daily" / "error_analysis"）
+    """
+    profile = student.cognitive_profile
+    source = interaction_data.get("source", "daily")
+    # 诊断结论权重高，日常观察权重低（避免一次闲聊大幅改变画像）
+    weight = 0.3 if source == "daily" else 0.5
+
+    if "abstract_thinking_evidence" in interaction_data:
+        profile.abstract_thinking = _weighted_update(
+            profile.abstract_thinking, interaction_data["abstract_thinking_evidence"], weight
+        )
+    if "metacognition_evidence" in interaction_data:
+        profile.metacognition_level = _weighted_update(
+            profile.metacognition_level, interaction_data["metacognition_evidence"], weight
+        )
+    if "math_anxiety_evidence" in interaction_data:
+        profile.math_anxiety = _weighted_update(
+            profile.math_anxiety, interaction_data["math_anxiety_evidence"], weight
+        )
+    if "working_memory_evidence" in interaction_data:
+        # 工作记忆是离散档位，用证据直接调整档位
+        if interaction_data["working_memory_evidence"] >= 0.6:
+            profile.working_memory_capacity = "high"
+        elif interaction_data["working_memory_evidence"] <= 0.25:
+            profile.working_memory_capacity = "low"
+    if "flexibility_evidence" in interaction_data:
+        profile.executive_function["flexibility"] = _weighted_update(
+            profile.executive_function.get("flexibility", 0.4),
+            interaction_data["flexibility_evidence"],
+            weight,
+        )
+
+    # 认知阶段动态推断（基于抽象思维）
+    if profile.abstract_thinking >= 0.65 and profile.cognitive_stage != "formal":
+        profile.cognitive_stage = "formal"
+    elif profile.abstract_thinking >= 0.4 and profile.cognitive_stage == "concrete":
+        profile.cognitive_stage = "transitional"
+
+    # 更新置信度（有证据就微升，封顶 0.95）
+    profile.assessment_confidence = min(0.95, profile.assessment_confidence + 0.05)
+    now = datetime.now()
+    profile.last_assessed = now.isoformat(timespec="seconds")
+    profile.last_updated = now.isoformat(timespec="seconds")
+
+
+def apply_cognitive_decay(student) -> None:
+    """应用认知画像衰减（时间越久置信度越低，B3）。"""
+    profile = student.cognitive_profile
+    if not profile.last_assessed:
+        return
+    try:
+        last_date = datetime.fromisoformat(profile.last_assessed)
+    except ValueError:
+        return
+    days_since = (datetime.now() - last_date).days
+    if days_since > COGNITIVE_DECAY_DAYS:
+        weeks = (days_since - COGNITIVE_DECAY_DAYS) / 7
+        decay = (1 - COGNITIVE_DECAY_RATE) ** weeks
+        profile.assessment_confidence = round(max(0.0, profile.assessment_confidence * decay), 4)
+
+
+def should_reassess(student) -> bool:
+    """判断是否需要重新做认知评估。"""
+    profile = student.cognitive_profile
+    if profile.assessment_confidence < REASSESS_CONFIDENCE_THRESHOLD:
+        return True
+    if not profile.last_assessed:
+        return True
+    try:
+        days = (datetime.now() - datetime.fromisoformat(profile.last_assessed)).days
+    except ValueError:
+        return True
+    return days > REASSESS_DAYS
