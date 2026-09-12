@@ -59,16 +59,251 @@ function initThemeUI() {
   $("#btn-settings").onclick = () => {
     $("#settings-overlay").classList.remove("hidden");
     loadApiKey();
+    loadPureMode();
   };
   $("#btn-settings-close").onclick = () => $("#settings-overlay").classList.add("hidden");
   $("#settings-overlay").addEventListener("click", e => {
     if (e.target === e.currentTarget) e.currentTarget.classList.add("hidden");
   });
   $("#btn-apikey-save").onclick = saveApiKey;
+  // LLM 配置相关
+  $("#btn-llm-save").onclick = saveLLMConfig;
+  $("#btn-llm-test").onclick = testLLMConnection;
+  $("#llm-provider").onchange = onLLMProviderChange;
+  // V3.0 P0: 纯学习模式开关
+  $("#pure-mode-toggle").onchange = savePureMode;
+
+  loadLLMConfig();
   applyTheme(localStorage.getItem("xy_theme") || "matcha", false);
 }
 
 async function loadApiKey() {
+  try {
+    const data = await api("/api/config", null, "GET");
+    const input = $("#apikey-input");
+    const status = $("#apikey-status");
+    input.value = "";
+    input.placeholder = data.has_key ? data.api_key_masked : "sk-xxxxxxxxxxxxxxxx";
+    status.textContent = "";
+    status.className = "apikey-status";
+  } catch (_) { /* 静默 */ }
+}
+
+// V3.0 P0: 纯学习模式开关
+async function loadPureMode() {
+  try {
+    const data = await api("/api/config", null, "GET");
+    $("#pure-mode-toggle").checked = !!data.pure_mode;
+  } catch (_) { /* 静默 */ }
+}
+
+async function savePureMode() {
+  try {
+    const on = $("#pure-mode-toggle").checked;
+    await api("/api/config", { pure_mode: on });
+    toast(on ? "🧘 纯学习模式已开启" : "✨ 趣味模式已恢复", 2000);
+  } catch (e) {
+    toast("保存失败：" + (e.message || "未知错误"), 2500);
+  }
+}
+
+async function saveApiKey() {
+  const input = $("#apikey-input");
+  const status = $("#apikey-status");
+  const key = input.value.trim();
+  if (!key) { status.textContent = "请输入 API Key"; status.className = "apikey-status err"; return; }
+  try {
+    await api("/api/config", { api_key: key });
+    status.textContent = "已保存！下次对话自动生效 ✅";
+    status.className = "apikey-status ok";
+    input.value = "";
+    input.placeholder = (key.slice(0, 7) + "****" + key.slice(-4));
+  } catch (e) {
+    status.textContent = "保存失败：" + (e.message || "未知错误");
+    status.className = "apikey-status err";
+  }
+}
+
+// ---------------------------------------------------------------- LLM 配置
+
+async function loadLLMConfig() {
+  try {
+    const data = await api("/api/llm/config", null, "GET");
+
+    // 填充提供商列表
+    const providerSelect = $("#llm-provider");
+    providerSelect.innerHTML = "";
+    data.providers.forEach(p => {
+      const opt = document.createElement("option");
+      opt.value = p.id;
+      opt.textContent = p.name + (p.free ? " 🆓" : "");
+      providerSelect.appendChild(opt);
+    });
+    providerSelect.value = data.current_provider;
+
+    // 填充模型列表
+    const modelSelect = $("#llm-model");
+    modelSelect.innerHTML = "";
+    const currentProvider = data.providers.find(p => p.id === data.current_provider);
+    if (currentProvider) {
+      currentProvider.models.forEach(m => {
+        const opt = document.createElement("option");
+        opt.value = m;
+        opt.textContent = m;
+        modelSelect.appendChild(opt);
+      });
+    }
+    modelSelect.value = data.current_model;
+
+    // 显示/隐藏免费标签和备注
+    const freeTag = $("#llm-free-tag");
+    const freeNote = $("#llm-free-note");
+    if (currentProvider && currentProvider.free) {
+      freeTag.classList.remove("hidden");
+      freeNote.textContent = currentProvider.free_note || "";
+      freeNote.classList.remove("hidden");
+    } else {
+      freeTag.classList.add("hidden");
+      freeNote.classList.add("hidden");
+    }
+
+    // 显示/隐藏自定义配置
+    const customSection = $("#llm-custom-section");
+    if (data.current_provider === "custom") {
+      customSection.classList.remove("hidden");
+      $("#llm-custom-url").value = data.custom_base_url;
+      $("#llm-custom-model").value = data.custom_model;
+    } else {
+      customSection.classList.add("hidden");
+    }
+
+    const status = $("#llm-status");
+    status.textContent = "";
+    status.className = "apikey-status";
+  } catch (_) { /* 静默 */ }
+}
+
+async function onLLMProviderChange() {
+  const providerId = $("#llm-provider").value;
+  try {
+    const data = await api("/api/llm/config", null, "GET");
+    const currentProvider = data.providers.find(p => p.id === providerId);
+
+    // 更新模型列表
+    const modelSelect = $("#llm-model");
+    modelSelect.innerHTML = "";
+    if (currentProvider) {
+      currentProvider.models.forEach(m => {
+        const opt = document.createElement("option");
+        opt.value = m;
+        opt.textContent = m;
+        modelSelect.appendChild(opt);
+      });
+    }
+
+    // 显示/隐藏免费标签和备注
+    const freeTag = $("#llm-free-tag");
+    const freeNote = $("#llm-free-note");
+    if (currentProvider && currentProvider.free) {
+      freeTag.classList.remove("hidden");
+      freeNote.textContent = currentProvider.free_note || "";
+      freeNote.classList.remove("hidden");
+    } else {
+      freeTag.classList.add("hidden");
+      freeNote.classList.add("hidden");
+    }
+
+    // 显示/隐藏自定义配置
+    const customSection = $("#llm-custom-section");
+    if (providerId === "custom") {
+      customSection.classList.remove("hidden");
+    } else {
+      customSection.classList.add("hidden");
+    }
+  } catch (_) {}
+}
+
+async function saveLLMConfig() {
+  const provider = $("#llm-provider").value;
+  const model = $("#llm-model").value;
+  const apiKey = $("#llm-apikey-input").value.trim();
+
+  if (provider === "custom") {
+    const customUrl = $("#llm-custom-url").value.trim();
+    const customModel = $("#llm-custom-model").value.trim();
+    if (!customUrl || !customModel) {
+      $("#llm-status").textContent = "请填写自定义 Base URL 和模型名";
+      $("#llm-status").className = "apikey-status err";
+      return;
+    }
+    try {
+      await api("/api/llm/config", { 
+        provider, 
+        model: customModel, 
+        api_key: apiKey,
+        base_url: customUrl
+      });
+      $("#llm-status").textContent = "已保存！下次对话自动生效 ✅";
+      $("#llm-status").className = "apikey-status ok";
+    } catch (e) {
+      $("#llm-status").textContent = "保存失败：" + (e.message || "未知错误");
+      $("#llm-status").className = "apikey-status err";
+    }
+    return;
+  }
+
+  if (!apiKey) {
+    $("#llm-status").textContent = "请输入 API Key";
+    $("#llm-status").className = "apikey-status err";
+    return;
+  }
+
+  try {
+    await api("/api/llm/config", { provider, model, api_key: apiKey });
+    $("#llm-status").textContent = "已保存！下次对话自动生效 ✅";
+    $("#llm-status").className = "apikey-status ok";
+  } catch (e) {
+    $("#llm-status").textContent = "保存失败：" + (e.message || "未知错误");
+    $("#llm-status").className = "apikey-status err";
+  }
+}
+
+async function testLLMConnection() {
+  const provider = $("#llm-provider").value;
+  const model = $("#llm-model").value;
+  const apiKey = $("#llm-apikey-input").value.trim();
+  let baseUrl = "";
+
+  if (provider === "custom") {
+    baseUrl = $("#llm-custom-url").value.trim();
+  }
+
+  if (!apiKey) {
+    $("#llm-status").textContent = "请先输入 API Key";
+    $("#llm-status").className = "apikey-status err";
+    return;
+  }
+
+  const status = $("#llm-status");
+  status.textContent = "测试中...";
+  status.className = "apikey-status";
+
+  try {
+    const data = await api("/api/llm/test", { provider, model, api_key: apiKey, base_url: baseUrl });
+    if (data.success) {
+      status.textContent = "✅ 连接成功：" + (data.response || "正常");
+      status.className = "apikey-status ok";
+    } else {
+      status.textContent = "❌ " + (data.error || "连接失败");
+      status.className = "apikey-status err";
+    }
+  } catch (e) {
+    status.textContent = "❌ 测试失败：" + (e.message || "未知错误");
+    status.className = "apikey-status err";
+  }
+}
+
+async function api(path, body, method = "POST") {
   try {
     const data = await api("/api/config", null, "GET");
     const input = $("#apikey-input");
@@ -195,7 +430,15 @@ $all(".mood-btn").forEach(btn => {
     $("#mood-overlay").classList.add("hidden");
     $(".app").classList.remove("hidden");
     await startSession(mood);
+    // V3.0 P1: 进入聊天后加载宠物头像与连击状态
+    loadPetView();
+    loadComboState();
   };
+});
+
+// V3.0 P1: 宠物头像点击 → 打开宠物面板
+document.addEventListener("click", e => {
+  if (e.target.closest("#pet-avatar")) openPetPanel();
 });
 
 let modeBarShown = false;  // 跟踪模式选择条是否已显示
@@ -207,8 +450,8 @@ async function startSession(mood) {
     replaceLastAi(info.opening);
     startTimer();
     loadProgressHeader();
-  // V-P0-3：开场白（情绪关怀）后显示模式快捷栏，输入框始终可用
-  $("#mode-quick-bar").classList.remove("hidden");
+  // V3.0 P0：开场用兴趣搭讪式，不再自动弹出模式快捷栏（学从聊天自然发生）
+  // 孩子表达模式意图时，后端 _detect_mode_intent 识别后经 SSE 提示前端展示
 } catch (e) {
     replaceLastAi(`哎呀连接出了点问题（${e.message}），刷新再试试？`);
   }
@@ -311,6 +554,34 @@ async function consumeSSE(resp, bubble) {
         scrollBottom();
       } else if (type === "eval") {
         handleEval(data);
+      } else if (type === "insight") {
+        // V3.0 P0: 顿悟时刻庆祝
+        bubble.classList.remove("typing-dot");
+        const quote = data.student_quote || "";
+        bubble.innerHTML = renderMathText(
+          `✨ 顿悟时刻！${quote ? `"${quote}"` : ""}` +
+          `\n\n小圆发现你自己想通了！这种感觉是不是很棒？继续加油！🌟`
+        );
+        triggerInsightEffect();
+        if (data.xp_reward) {
+          toast(`✨ 顿悟奖励 +${data.xp_reward} XP！`, 3000);
+        }
+        scrollBottom();
+      } else if (type === "combo_update") {
+        // V3.0 P1: 连击状态更新（包含里程碑庆祝）
+        handleComboSSE(data);
+      } else if (type === "card_drop") {
+        // V3.0 P1: 卡片掉落翻牌动画
+        handleCardDropSSE(data);
+      } else if (type === "pet_feed") {
+        // V3.0 P1: 宠物 XP 入账（飘字 + 升级庆祝）
+        handlePetFeedSSE(data);
+      } else if (type === "level_complete") {
+        // V3.0 P2 模块D：冒险关卡自动通关 → 全局通关弹窗
+        if (window.AdventureView) window.AdventureView.showComplete(data);
+      } else if (type === "mode_hint") {
+        // V3.0 P0: 孩子表达学习意图后，才展示模式快捷栏（不强制、自然发生）
+        $("#mode-quick-bar").classList.remove("hidden");
       } else if (type === "error") {
         bubble.classList.remove("typing-dot");
         bubble.innerHTML = renderMathText(data.message);
@@ -589,8 +860,9 @@ $all(".tab").forEach(tab => {
     $(`#view-${tab.dataset.view}`).classList.add("active");
     currentView = tab.dataset.view;
     if (currentView === "sky") renderMindmap();
-    if (currentView === "badges") renderBadges();
+    if (currentView === "badges") { renderBadges(); renderCardsView(); if (window.AdventureView) window.AdventureView.load(); }
     if (currentView === "cognitive") renderCognitiveProfile();
+    if (currentView === "pbl") { if (window.PBLView) window.PBLView.loadInto("view-pbl"); }
   };
 });
 
@@ -985,7 +1257,31 @@ function hexToRgba(hex, alpha) {
   return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${alpha})`;
 }
 
+// ---------------------------------------------------------------- 顿悟动效
+function triggerInsightEffect() {
+  const chat = $("#chat-messages");
+  if (chat) chat.classList.add("insight-golden-burst");
+  setTimeout(() => { if (chat) chat.classList.remove("insight-golden-burst"); }, 2500);
+}
+
 // ---------------------------------------------------------------- 庆祝动效
+function drawStarShape(ctx, cx, cy, radius, points) {
+  const spikes = points;
+  const outer = radius;
+  const inner = radius * 0.4;
+  let rot = -Math.PI / 2;
+  const step = Math.PI / spikes;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - outer);
+  for (let i = 0; i < spikes; i++) {
+    ctx.lineTo(cx + Math.cos(rot) * outer, cy + Math.sin(rot) * outer);
+    rot += step;
+    ctx.lineTo(cx + Math.cos(rot) * inner, cy + Math.sin(rot) * inner);
+    rot += step;
+  }
+  ctx.closePath();
+}
+
 function celebrate() {
   const canvas = $("#celebrate-canvas");
   const ctx = canvas.getContext("2d");
@@ -1285,3 +1581,24 @@ function initVoiceInput() {
 initThemeUI();
 initProfile();
 initVoiceInput();
+
+// V3.0 P2 模块D/E/F：冒险地图 + PBL 视图初始化与导弹模拟器接线
+if (window.AdventureView) window.AdventureView.init();
+if (window.CoCreation) window.CoCreation.init();
+if (window.PBLView) {
+  window.PBLView.init();
+  // 挂载导弹模拟器：renderFn(box, simulatorConfig)，simulator_type 从 enter 响应 level 中取
+  if (window.MissileProject) {
+    window.PBLView.setSimulator((box, cfg) => {
+      const lvl = (window.PBLView._levelData && window.PBLView._levelData.level) || {};
+      const type = lvl.simulator_type || "missile_level1";
+      window.MissileProject.mountSimulator(box, type, cfg);
+    });
+    // 模拟器命中 → 通关上报 → PBL 结算
+    window.MissileProject.setCompleteHandler(payload => {
+      if (window.PBLView.currentProjectId && window.PBLView.currentLevelId) {
+        window.PBLView.submitComplete(window.PBLView.currentProjectId, window.PBLView.currentLevelId, payload);
+      }
+    });
+  }
+}

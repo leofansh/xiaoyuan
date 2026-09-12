@@ -1,0 +1,277 @@
+/* ============================================================
+   小圆助教 · 模块 F「导弹发射弧线」模拟器样式 (missile.css)
+   规格 8.3 / 8.7 · 颜色沿用 style.css 主题变量
+   ============================================================ */
+
+.missile-sim {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--bg2, #ebf4e3);
+  border-radius: 16px;
+  background: var(--bg1, #f7fbf3);
+  box-shadow: var(--soft-shadow, 0 6px 18px rgba(150, 187, 133, .28));
+}
+
+/* ---------------- 画布容器 ---------------- */
+.missile-canvas-wrap {
+  position: relative;
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--bg2, #ebf4e3);
+  background: #a7d8ff;
+}
+
+.missile-canvas {
+  display: block;
+  width: 100%;
+}
+
+/* 命中闪光（DOM 层 keyframes） */
+.missile-hit-flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.missile-hit-flash.active {
+  animation: missile-flash .6s ease-out;
+}
+
+@keyframes missile-flash {
+  0%   { opacity: .85; background: radial-gradient(circle, rgba(255, 236, 170, .95) 0%, rgba(255, 170, 80, .6) 45%, transparent 75%); }
+  100% { opacity: 0;   background: transparent; }
+}
+
+/* ---------------- 状态栏 ---------------- */
+.missile-hud {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+.missile-attempts {
+  color: var(--muted, #97a78d);
+  font-weight: 600;
+}
+
+.missile-result {
+  color: var(--accent, #7ca26c);
+  font-weight: 700;
+}
+
+/* ---------------- 参数面板（横排，窄屏换行） ---------------- */
+.missile-controls {
+  display: flex;
+  align-items: center;
+  gap: 14px 18px;
+  flex-wrap: wrap;
+}
+
+.missile-param {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 180px;
+  min-width: 170px;
+}
+
+.missile-param-name {
+  flex-shrink: 0;
+  font-size: 13px;
+  color: var(--text, #444);
+  font-weight: 600;
+  min-width: 2.4em;
+}
+
+.missile-param input[type="range"] {
+  flex: 1;
+  min-width: 80px;
+  accent-color: var(--main, #96bb85);
+  cursor: pointer;
+  height: 4px;
+}
+
+.missile-param-val {
+  flex-shrink: 0;
+  min-width: 4.2em;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent, #7ca26c);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------- 按钮 ---------------- */
+.missile-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.missile-btn {
+  border: 1px solid var(--main, #96bb85);
+  background: var(--chip-bg, #f2f8ec);
+  color: var(--chip-text, #77966a);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all .2s;
+  white-space: nowrap;
+}
+
+.missile-btn:hover {
+  border-color: var(--main-strong, #83ab72);
+  background: var(--bg2, #ebf4e3);
+  box-shadow: var(--soft-shadow, 0 6px 18px rgba(150, 187, 133, .28));
+}
+
+.missile-btn:active {
+  transform: translateY(1px);
+}
+
+.missile-btn-fire {
+  background: var(--accent, #7ca26c);
+  border-color: var(--accent, #7ca26c);
+  color: #fff;
+}
+
+.missile-btn-fire:hover {
+  background: var(--main-strong, #83ab72);
+  border-color: var(--main-strong, #83ab72);
+  color: #fff;
+}
+
+.missile-btn-help {
+  border-color: var(--accent, #7ca26c);
+  color: var(--accent, #7ca26c);
+}
+
+.missile-btn-edit {
+  border-style: dashed;
+}
+
+/* ---------------- 编辑器面板（Lv.6） ---------------- */
+.missile-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border: 1px dashed var(--main, #96bb85);
+  border-radius: 12px;
+  background: var(--chip-bg, #f2f8ec);
+}
+
+.missile-editor-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent, #7ca26c);
+}
+
+.missile-editor-subtitle {
+  margin-top: 4px;
+  font-size: 13px;
+}
+
+.missile-editor-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+.missile-editor-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted, #97a78d);
+  flex: 1 1 140px;
+}
+
+.missile-editor-field input {
+  padding: 7px 10px;
+  border: 1px solid var(--bg2, #ebf4e3);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--text, #444);
+  font-size: 13px;
+}
+
+.missile-editor-field input:focus {
+  outline: none;
+  border-color: var(--accent, #7ca26c);
+}
+
+.missile-editor-check {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text, #444);
+  padding-bottom: 7px;
+}
+
+.missile-editor-check input {
+  accent-color: var(--main, #96bb85);
+  width: 16px;
+  height: 16px;
+}
+
+.missile-editor-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* 已保存关卡列表 */
+.missile-level-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.missile-level-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid var(--bg2, #ebf4e3);
+  font-size: 13px;
+}
+
+.missile-level-name {
+  font-weight: 700;
+  color: var(--text, #444);
+}
+
+.missile-level-meta {
+  flex: 1;
+  color: var(--muted, #97a78d);
+  font-size: 12px;
+}
+
+.missile-level-empty {
+  color: var(--muted, #97a78d);
+  font-size: 13px;
+  padding: 6px 0;
+}
+
+/* ---------------- 响应式（窄屏参数面板换行） ---------------- */
+@media (max-width: 640px) {
+  .missile-sim { padding: 10px; }
+  .missile-param { flex: 1 1 100%; min-width: 100%; }
+  .missile-actions { width: 100%; }
+  .missile-actions .missile-btn { flex: 1 1 auto; }
+  .missile-hud { flex-direction: column; align-items: flex-start; }
+}

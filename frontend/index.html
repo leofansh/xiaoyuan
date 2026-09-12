@@ -6,6 +6,13 @@
 <title>小圆助教 🌸</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐱</text></svg>">
 <link rel="stylesheet" href="/css/style.css?v=15">
+<link rel="stylesheet" href="/css/pet.css?v=1">
+<link rel="stylesheet" href="/css/cards.css?v=1">
+<link rel="stylesheet" href="/css/combo.css?v=1">
+<link rel="stylesheet" href="/css/adventure.css?v=1">
+<link rel="stylesheet" href="/css/pbl.css?v=1">
+<link rel="stylesheet" href="/css/co-creation.css?v=1">
+<link rel="stylesheet" href="/css/missile.css?v=1">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
@@ -48,6 +55,7 @@
       <button class="tab" data-view="sky" data-i18n="nav.knowledge">🧠 知识脑图</button>
       <button class="tab" data-view="badges" data-i18n="nav.badges">🏅 成长墙</button>
       <button class="tab" data-view="cognitive" data-i18n="nav.cognitive">🔬 认知画像</button>
+      <button class="tab" data-view="pbl" data-i18n="nav.pbl">🚀 项目挑战</button>
     </nav>
     <div class="streak-chip" id="streak-chip" data-i18n-title="streak.title" title="连续学习天数（保底日也算）">🔥 <span id="streak-num">0</span><span data-i18n="streak.days">天</span></div>
     <button id="btn-settings" data-i18n-title="settings.theme" title="主题装扮">🎨</button>
@@ -57,9 +65,11 @@
   <!-- 视图1：聊天 -->
   <main id="view-chat" class="view active">
     <div id="chat-scroll" class="chat-scroll"></div>
-    <!-- V-P0-3：模式快捷栏（开场后显示，点选或打字均可），不再强制弹窗 -->
+    <!-- V3.0 P1：宠物悬浮头像（点击打开宠物面板） -->
+    <div id="pet-avatar" class="pet-avatar hidden" title="我的宠物"></div>
+    <!-- V3.0 P0：模式快捷栏（孩子表达学习意向后经 mode_hint 事件展示，不强制弹窗） -->
     <div id="mode-quick-bar" class="mode-quick-bar hidden">
-      <span class="mode-quick-hint">今天想怎么学？打几个字告诉我也行哦～</span>
+      <span class="mode-quick-hint">想用什么节奏学，打几个字告诉我也行哦～</span>
       <button class="mode-quick-btn" data-mode="A">🌟 深入探索</button>
       <button class="mode-quick-btn" data-mode="B">🛡 快速过一遍</button>
       <button class="mode-quick-btn" data-mode="weekend">🧹 周末修复</button>
@@ -90,6 +100,7 @@
       <span id="status-topic" data-i18n="status.topic">📌 今天聚焦：待会儿选</span>
       <span id="status-time" data-i18n="status.time">⏱ 0分钟</span>
       <span id="status-confidence">💪 --</span>
+      <span id="combo-indicator" class="combo-indicator hidden"></span>
       <span id="thinking-model-tag" class="thinking-model-tag hidden"></span>
     </div>
     <!-- 番茄闹钟悬浮图标（选完模式后显示） -->
@@ -132,6 +143,8 @@
     <canvas id="confidence-chart" height="120"></canvas>
     <h3 class="section-title" data-i18n="badges.myBadges">🏅 我的徽章</h3>
     <div id="badge-grid" class="badge-grid"></div>
+    <!-- V3.0 P1：卡片收藏墙（规格 4.4 CollectionWall） -->
+    <div id="cards-section"></div>
     <div id="gap-list-wrap">
       <h3 class="section-title" data-i18n="badges.gaps">🔍 待修复的漏洞（修好一个亮一颗星）</h3>
       <ul id="gap-list" class="gap-list"></ul>
@@ -158,6 +171,9 @@
       </div>
     </div>
   </main>
+
+  <!-- V3.0 P2 模块E：PBL 项目视图 -->
+  <main id="view-pbl" class="view pbl-view"></main>
 </div>
 
 <!-- 主题设置面板 -->
@@ -179,6 +195,54 @@
       <button class="lang-btn active" data-lang="zh" data-i18n="settings.langZh">中文</button>
       <button class="lang-btn" data-lang="en" data-i18n="settings.langEn">English</button>
     </div>
+
+    <!-- LLM 提供商配置（V3.0） -->
+    <h3 class="section-title" style="text-align:left;margin:20px 0 8px" data-i18n="settings.llmTitle">🤖 LLM 模型</h3>
+    <div id="llm-provider-section">
+      <div class="llm-row">
+        <label data-i18n="settings.llmProvider">提供商</label>
+        <select id="llm-provider" class="llm-select"></select>
+        <span id="llm-free-tag" class="llm-free-tag hidden" data-i18n="settings.free">免费</span>
+      </div>
+      <div class="llm-row">
+        <label data-i18n="settings.llmModel">模型</label>
+        <select id="llm-model" class="llm-select"></select>
+      </div>
+      <div class="llm-row">
+        <label data-i18n="settings.llmApiKey">API Key</label>
+        <input id="llm-apikey-input" type="password" placeholder="sk-xxxxxxxxxxxxxxxx" autocomplete="off">
+      </div>
+      <div id="llm-free-note" class="llm-free-note hidden" data-i18n="settings.freeNote"></div>
+      <div class="llm-row">
+        <button id="btn-llm-save" class="btn-primary" style="width:auto;padding:8px 18px" data-i18n="settings.save">保存</button>
+        <button id="btn-llm-test" class="btn-secondary" style="width:auto;padding:8px 18px;margin-left:8px" data-i18n="settings.test">测试连接</button>
+      </div>
+      <div id="llm-status" class="apikey-status"></div>
+      <!-- 自定义提供商配置 -->
+      <div id="llm-custom-section" class="hidden">
+        <div class="llm-row">
+          <label data-i18n="settings.customBaseUrl">自定义 Base URL</label>
+          <input id="llm-custom-url" type="text" placeholder="https://api.example.com/v1">
+        </div>
+        <div class="llm-row">
+          <label data-i18n="settings.customModel">模型名</label>
+          <input id="llm-custom-model" type="text" placeholder="gpt-4">
+        </div>
+      </div>
+    </div>
+
+    <!-- V3.0 P0: 纯学习模式开关 -->
+    <div class="apikey-row" style="margin-top:14px;justify-content:space-between">
+      <div>
+        <div style="font-size:14px;font-weight:600" data-i18n="settings.pureMode">🧘 纯学习模式</div>
+        <div style="font-size:12px;color:var(--muted)" data-i18n="settings.pureModeHint">关闭趣味动画与游戏化提示，只保留最纯粹的学习对话</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="pure-mode-toggle">
+        <span class="slider"></span>
+      </label>
+    </div>
+
     <button id="btn-settings-close" class="btn-primary" style="margin-top:16px" data-i18n="settings.close">就用这个啦 ✨</button>
   </div>
 </div>
@@ -201,11 +265,38 @@
 <!-- 庆祝动效层 -->
 <canvas id="celebrate-canvas" class="celebrate-layer"></canvas>
 
+<!-- V3.0 P1：宠物面板弹窗（规格 3.3 宠物屋） -->
+<div id="pet-overlay" class="pet-overlay hidden">
+  <div class="pet-panel" id="pet-panel"></div>
+</div>
+
+<!-- V3.0 P1：卡片掉落弹窗（规格 4.4 CardRevealModal） -->
+<div id="card-drop-overlay" class="card-drop-overlay hidden">
+  <div class="card-drop-card">
+    <div class="card-drop-title" id="card-drop-title"></div>
+    <div class="card-drop-body">
+      <div class="big-card" id="card-drop-big"></div>
+    </div>
+    <div class="card-drop-info" id="card-drop-info"></div>
+    <div class="card-drop-btns">
+      <button class="btn-primary" onclick="closeCardDrop()">收下啦 ✨</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div id="toast" class="toast hidden"></div>
 
 <script src="/js/i18n.js"></script>
 <script src="/js/math.js?v=1"></script>
-<script src="/js/app.js?v=16"></script>
+<script src="/js/pet.js?v=1"></script>
+<script src="/js/cards.js?v=1"></script>
+<script src="/js/combo.js?v=1"></script>
+<script src="/js/adventure.js?v=1"></script>
+<script src="/js/pbl.js?v=1"></script>
+<script src="/js/simulators/missile.js?v=3"></script>
+<script src="/js/pbl-missile.js?v=1"></script>
+<script src="/js/co-creation.js?v=1"></script>
+<script src="/js/app.js?v=18"></script>
 </body>
 </html>

@@ -260,6 +260,13 @@ def _match_strategy(student, strategy: TeachingStrategy, problem_type: str, cont
     if strategy.id == "decomposition" and step_count > 3:
         score += 0.4
 
+    # V3.0 P0: 动态难度
+    recent_correct_rate = context.get("recent_correct_rate", 0.5)
+    if strategy.id == "scaffold_questioning" and context.get("prefer_scaffold"):
+        score += 0.3
+    if strategy.id == "variant_practice" and context.get("encourage_challenge"):
+        score += 0.2
+
     return min(score, 1.0)
 
 

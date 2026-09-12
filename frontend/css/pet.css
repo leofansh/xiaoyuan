@@ -1,0 +1,299 @@
+/* ============================================================
+   V3.0 P1 · 宠物系统样式
+   ============================================================ */
+
+#view-chat { position: relative; }
+
+/* ---------------- 聊天页宠物头像（悬浮角落） ---------------- */
+.pet-avatar {
+  position: absolute;
+  right: 16px;
+  bottom: 72px;              /* input-area 上方 */
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--light), var(--main));
+  border: 2.5px solid var(--main);
+  box-shadow: var(--soft-shadow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 30;
+  font-size: 30px;
+  transition: transform .2s;
+  user-select: none;
+}
+.pet-avatar:hover { transform: scale(1.08); }
+.pet-avatar .pet-lv-badge {
+  position: absolute;
+  right: -6px;
+  bottom: -4px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 2px solid #fff;
+  line-height: 1.5;
+}
+.pet-avatar .pet-mood-dot {
+  position: absolute;
+  left: -2px;
+  top: -2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: var(--muted);
+}
+.pet-avatar .pet-mood-dot.happy { background: #4caf50; }
+.pet-avatar .pet-mood-dot.sad { background: #f44336; }
+.pet-avatar .xp-float {
+  position: absolute;
+  left: 50%;
+  top: -18px;
+  transform: translateX(-50%);
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--accent);
+  animation: xp-float-up 1.4s ease-out forwards;
+  pointer-events: none;
+  white-space: nowrap;
+}
+@keyframes xp-float-up {
+  0% { opacity: 0; transform: translate(-50%, 8px) scale(.7); }
+  20% { opacity: 1; transform: translate(-50%, -4px) scale(1.15); }
+  70% { opacity: 1; transform: translate(-50%, -20px) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -34px) scale(.9); }
+}
+
+/* 互动弹跳 */
+.pet-avatar.pet-bounce { animation: pet-bounce .6s ease; }
+@keyframes pet-bounce {
+  0%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-14px) scale(1.1); }
+  60% { transform: translateY(0) scale(.95); }
+}
+
+/* ---------------- 宠物面板弹窗 ---------------- */
+.pet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background: rgba(0,0,0,.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fade-in .25s ease;
+}
+.pet-panel {
+  width: min(420px, 92vw);
+  max-height: 88vh;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 24px;
+  padding: 24px 22px 28px;
+  text-align: center;
+  box-shadow: var(--card-shadow);
+  animation: pop-in .4s cubic-bezier(.2,1.4,.4,1);
+}
+.pet-panel .close-x {
+  float: right;
+  background: none;
+  border: none;
+  font-size: 22px;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0 4px;
+}
+.pet-panel-face {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 4px 0 8px;
+}
+.pet-panel-emoji {
+  font-size: 52px;
+  width: 76px;
+  height: 76px;
+  border-radius: 20px;
+  background: var(--light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.pet-meta { text-align: left; flex: 1; }
+.pet-meta .pet-name {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--accent);
+}
+.pet-meta .pet-level {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 2px 0 6px;
+}
+.pet-xp-bar {
+  height: 10px;
+  background: var(--light);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.pet-xp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--main), var(--main-strong));
+  border-radius: 999px;
+  transition: width .5s ease;
+}
+.pet-xp-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.pet-mood-line {
+  font-size: 13px;
+  color: var(--muted);
+  background: var(--chip-bg);
+  border-radius: 12px;
+  padding: 8px 12px;
+  margin: 6px 0 12px;
+}
+.pet-talent-line {
+  font-size: 12px;
+  color: var(--accent);
+  background: var(--light);
+  border-radius: 12px;
+  padding: 6px 10px;
+  margin: 0 0 10px;
+}
+.skin-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #5a4a4d;
+  text-align: left;
+  margin: 14px 0 8px;
+}
+.pet-skin-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.pet-skin-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 4px;
+  border-radius: 14px;
+  border: 2px solid var(--light);
+  background: #fff;
+  cursor: pointer;
+  transition: all .2s;
+}
+.pet-skin-btn:hover { border-color: var(--main); transform: translateY(-2px); }
+.pet-skin-btn.active { border-color: var(--main); background: var(--light); }
+.pet-skin-btn.locked { opacity: .45; }
+.pet-skin-btn .skin-emoji { font-size: 24px; }
+.pet-skin-btn .skin-name { font-size: 11px; color: var(--muted); }
+.pet-skin-btn .skin-lv { font-size: 10px; color: var(--accent); }
+.pet-rename-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.pet-rename-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1.5px solid var(--main);
+  font-size: 14px;
+  outline: none;
+}
+.pet-rename-row input:focus { border-color: var(--main-strong); }
+.pet-actions {
+  display: flex;
+  gap: 8px;
+  margin: 14px 0 2px;
+}
+.pet-actions button {
+  flex: 1;
+  padding: 10px 6px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1.5px solid var(--main);
+  background: #fff;
+  color: var(--accent);
+  transition: all .2s;
+}
+.pet-actions button:hover { background: var(--main); color: #fff; }
+.teach-box {
+  margin-top: 12px;
+  background: var(--chip-bg);
+  border-radius: 14px;
+  padding: 12px;
+  text-align: left;
+}
+.teach-box textarea {
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1.5px solid var(--main);
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+}
+.teach-box .teach-hint {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 6px 0;
+}
+.teach-box .teach-feedback {
+  font-size: 13px;
+  color: var(--accent);
+  margin: 8px 0 0;
+  font-weight: 600;
+}
+
+/* ---------------- 身份展示（等级 + 标签） ---------------- */
+.identity-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--chip-text);
+  background: var(--chip-bg);
+  border: 1.5px solid var(--main);
+  border-radius: 999px;
+  padding: 3px 12px;
+  cursor: pointer;
+  transition: all .2s;
+}
+.identity-tag:hover { transform: translateY(-1px); box-shadow: var(--soft-shadow); }
+.identity-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 4px;
+}
+.identity-badge {
+  font-size: 11px;
+  color: var(--accent);
+  background: var(--light);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+@media (max-width: 560px) {
+  .pet-avatar { right: 12px; bottom: 128px; width: 50px; height: 50px; font-size: 26px; }
+}

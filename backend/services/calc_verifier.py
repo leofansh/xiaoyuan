@@ -157,3 +157,39 @@ def verify_and_fix(text: str) -> tuple[str, list[dict]]:
         logger.warning("计算验证修正了%d处: %s", len(fixes), fixes)
 
     return text, fixes
+
+
+# ---------------------------------------------------------------------------
+# 自由文本数学表达式提取（V3.0 多 LLM 降级支持）
+# ---------------------------------------------------------------------------
+
+# 匹配数学表达式：数字+运算符组合，或简单的等式
+_FREE_TEXT_EXPR = re.compile(
+    r'(?<![A-Za-z0-9_])'
+    r'((?:\d+(?:\.\d+)?\s*[\+\-\*\/×÷]\s*)+\d+(?:\.\d+)?)'
+    r'(?![A-Za-z0-9_])'
+)
+
+# 匹配 "x = 值" 形式的答案
+_ANSWER_EXPR = re.compile(
+    r'(?:答案|结果是|等于|为|should be)\s*[=:＊*]\s*(\d+(?:\.\d+)?)',
+    re.IGNORECASE,
+)
+
+
+def extract_math_expressions(text: str) -> list[dict]:
+    """从自由文本中提取数学表达式及其预期结果。
+
+    返回值示例：
+    [{"expression": "2+3*4", "context": "计算 2+3*4 的结果"}, ...]
+    """
+    results = []
+    for match in _FREE_TEXT_EXPR.finditer(text):
+        expr = match.group(1).strip()
+        results.append({"expression": expr, "context": ""})
+
+    for match in _ANSWER_EXPR.finditer(text):
+        value = match.group(1)
+        results.append({"expression": value, "context": "answer"})
+
+    return results

@@ -43,25 +43,33 @@ VALID_TRANSITIONS = {
 
 
 def apply_eval(student: Student, eval_data: dict) -> list[str]:
-    """把AI评估块应用到学生档案，返回新触发的徽章列表。"""
+    """把AI评估块应用到学生档案，返回新触发的徽章列表。
+
+    V3.0 P1：内部同时处理 combo / 宠物XP / 卡片掉落（P1 游戏化三件套）。
+    奖励事件写入模块级 _P1_REWARDS，由 chat 层通过 pop_p1_rewards() 取出推送 SSE。
+    """
     new_badges: list[str] = []
 
     # 1. 掌握度更新（贝叶斯增量更新，B1）
     from backend.services.mastery_tracker import update_mastery
 
     mastery_updates = eval_data.get("mastery_updates") or {}
-    independent_success = eval_data.get("independent_success")
+    independent_success = eval_data.get("independent_success") is True
+    newly_mastered: list[str] = []  # 掌握度从 <0.7 跨越到 >=0.7 的知识点
     for topic_id, score in mastery_updates.items():
         if not syllabus.get_node(topic_id) or not isinstance(score, (int, float)):
             continue
 
         old_rec = student.mastery.get(topic_id)
+        old_score = old_rec.score if old_rec else 0.0
         new_rec = update_mastery(
             old_rec,
             observed_correct=independent_success,
             llm_score=float(score),
         )
         student.mastery[topic_id] = new_rec
+        if old_score < 0.7 <= new_rec.score:
+            newly_mastered.append(topic_id)
 
     # 2. 新漏洞
     # 2. 新漏洞（B2：精细分类 + 根因 + 修复策略 + 复发追踪）
@@ -262,7 +270,221 @@ def apply_eval(student: Student, eval_data: dict) -> list[str]:
         if transition.source != "keep":
             logger.info("状态 %s → %s（%s）: %s", current_state, transition.new_state, transition.source, transition.reason)
 
+    # ============ V3.0 P1：游戏化奖励（combo / 宠物XP / 卡片） ============
+    is_answer_eval = bool(mastery_updates) or bool(eval_data.get("gaps_found")) or bool(eval_data.get("gaps_cleared"))
+    _P1_REWARDS.update(
+        _apply_p1_rewards(
+            student,
+            independent_success=independent_success,
+            newly_mastered=newly_mastered,
+            is_answer_eval=is_answer_eval,
+        )
+    )
+
+    # ============ V3.0 P1：身份认同更新（规格 11.4） ============
+    from backend.services.identity import update_identity, talent_attribution_silent
+    update_identity(student)
+
+    # ============ V3.0 P2 模块D：冒险自动通关（规格 6.3.3，掌握度达标自动判定） ============
+    _auto_complete_adventure_levels(student, newly_mastered)
+
     return new_badges
+
+
+# 模块级：当前轮 P1 奖励快照（由 chat 层在每次 apply_eval 后 pop）
+_P1_REWARDS: dict = {"combo": None, "card_drop": None, "xp_events": [], "pet": None}
+
+_COMBO_MESSAGES = {
+    "combo_3": "不错哦，继续保持！",
+    "combo_5": "超棒！5连击了！",
+    "combo_10": "哇！10连击！你是数学小天才！",
+}
+
+
+def pop_p1_rewards() -> dict:
+    """取走上一轮 P1 奖励快照并清空（供 chat 层 SSE 推送）。"""
+    global _P1_REWARDS
+    rewards = _P1_REWARDS
+    _P1_REWARDS = {"combo": None, "card_drop": None, "xp_events": [], "pet": None}
+    return rewards
+
+
+# 模块级：当前轮冒险自动通关事件（chat 层在每次 apply_eval 后 pop 推 SSE level_complete）
+_ADVENTURE_COMPLETIONS: list[dict] = []
+
+
+def pop_adventure_completions() -> list[dict]:
+    """取走上一轮冒险自动通关事件并清空（供 chat 层 SSE 推送，规格 6.3.3）。"""
+    global _ADVENTURE_COMPLETIONS
+    events = _ADVENTURE_COMPLETIONS
+    _ADVENTURE_COMPLETIONS = []
+    return events
+
+
+def _auto_complete_adventure_levels(student: Student, newly_mastered: list[str]) -> None:
+    """掌握度达标 → 自动通关冒险关卡（规格 6.3.3："学习后由后端自动判断"）。
+
+    对本次掌握度跨越 ≥0.7 的知识点，检查其对应冒险关卡；
+    已解锁且尚未通关的关卡调用 try_complete_level 结算（发放奖励/传播解锁）。
+    通关事件写入模块级 _ADVENTURE_COMPLETIONS，由 chat 层 pop 推送 SSE。
+    """
+    global _ADVENTURE_COMPLETIONS
+    from backend.config import get_pure_mode
+    if get_pure_mode() or not newly_mastered:
+        return
+    try:
+        from backend.knowledge.adventure_levels import all_levels
+        from backend.services.adventure_service import (
+            ensure_adventure,
+            is_level_unlocked,
+            try_complete_level,
+        )
+    except ImportError:
+        return
+
+    adventure = ensure_adventure(student.adventure_map)
+    student.adventure_map = adventure
+    completed_set = set(adventure.get("completed_levels", []) or [])
+    mastered_set = set(newly_mastered)
+
+    for level in all_levels():
+        if level.get("knowledge_node") not in mastered_set:
+            continue
+        if level["id"] in completed_set:
+            continue
+        if not is_level_unlocked(level, adventure):
+            continue
+        try:
+            result = try_complete_level(student, level["id"])
+        except Exception as e:  # noqa: BLE001
+            logger.warning("冒险自动通关 %s 失败: %s", level["id"], e)
+            continue
+        if result.get("completed") and result.get("rewards") is not None:
+            _ADVENTURE_COMPLETIONS.append({
+                "level_id": level["id"],
+                "level_name": level.get("name", level["id"]),
+                "stars_earned": result.get("stars_earned", 0),
+                "rewards": result.get("rewards"),
+                "newly_unlocked": result.get("newly_unlocked", []),
+                "message": result.get("message", ""),
+            })
+
+
+def _apply_p1_rewards(student: Student, *, independent_success: bool,
+                      newly_mastered: list[str], is_answer_eval: bool) -> dict:
+    """组合 模块C(combo) + 模块A(宠物XP) + 模块B(卡片) 的奖励逻辑。
+
+    触发条件（规格 5.3）：仅"主动答题并被评估"计 combo；
+    对话小确认（"对""嗯"）不计数，避免刷分。
+    """
+    import random as _random
+
+    from backend.config import get_pure_mode
+    from backend.knowledge.cards import drop_card, ensure_cards
+    from backend.services.pet import add_xp, ensure_pet
+
+    if get_pure_mode():
+        return {"combo": None, "card_drop": None, "xp_events": [], "pet": None}
+
+    rewards: dict = {"combo": None, "card_drop": None, "xp_events": [], "pet": None}
+
+    pet = student.pet or {}
+    pet = ensure_pet(pet)
+    combo = student.combo or {}
+
+    # 本周最佳：ISO 周键跨周重置
+    from datetime import datetime
+    iso_year, iso_week_n, _ = datetime.now().isocalendar()
+    week_key = f"{iso_year}-W{iso_week_n:02d}"
+    if combo.get("week_key") != week_key:
+        combo["best_this_week"] = 0
+        combo["week_key"] = week_key
+    combo.setdefault("current", 0)
+    combo.setdefault("best_all_time", 0)
+    combo.setdefault("total_combos_5", 0)
+    combo.setdefault("total_combos_10", 0)
+
+    # ---------- 答对（评估块确认）：combo+1 + XP + 概率掉卡 ----------
+    if independent_success:
+        prev = combo["current"]
+        combo["current"] = prev + 1
+        current = combo["current"]
+        combo["best_all_time"] = max(combo["best_all_time"], current)
+        combo["best_this_week"] = max(combo["best_this_week"], current)
+
+        milestone = None
+        xp_bonus = 0
+        if current == 3:
+            milestone = "combo_3"
+        elif current == 5:
+            milestone = "combo_5"
+            xp_bonus = 10
+            combo["total_combos_5"] += 1
+        elif current == 10:
+            milestone = "combo_10"
+            xp_bonus = 20
+            combo["total_combos_10"] += 1
+
+        rewards["combo"] = {
+            "current": current,
+            "previous": prev,
+            "milestone": milestone,
+            "xp_bonus": xp_bonus,
+            "message": _COMBO_MESSAGES.get(milestone or "", ""),
+        }
+
+        # 答对 +5 XP + 里程碑加成
+        rewards["xp_events"].append({"source": "correct_answer", "amount": 5, "message": ""})
+        if milestone and xp_bonus:
+            rewards["xp_events"].append({"source": f"combo_{current}", "amount": xp_bonus,
+                                         "message": rewards["combo"]["message"]})
+
+        # 答对 10% 随机掉卡（规格 4.3.3）
+        if _random.random() < 0.10:
+            cards = ensure_cards(student.cards)
+            dc = drop_card(cards, source="correct_answer")
+            student.cards = cards
+            if dc["dropped"] and rewards["card_drop"] is None:
+                rewards["card_drop"] = dc
+
+        # combo_10 额外 50% 掉卡（规格 5.3）
+        if milestone == "combo_10" and _random.random() < 0.50:
+            cards = ensure_cards(student.cards)
+            dc = drop_card(cards, source="combo_10")
+            student.cards = cards
+            if dc["dropped"] and rewards["card_drop"] is None:
+                rewards["card_drop"] = dc
+
+    elif is_answer_eval:
+        # ---------- 答错（明确答题被评估）：combo 归零，不惩罚 ----------
+        if combo["current"] > 0:
+            combo["current"] = 0
+            rewards["combo"] = {
+                "current": 0,
+                "previous": combo["current"],
+                "milestone": None,
+                "xp_bonus": 0,
+                "message": "",
+            }
+
+    # ---------- 新掌握知识点（≥0.7）：必掉卡 + 宠物+30XP（规格3.2/4.2） ----------
+    if newly_mastered:
+        cards = ensure_cards(student.cards)
+        for tid in newly_mastered:
+            dc = drop_card(cards, source="mastery", knowledge_node=tid, guaranteed=True)
+            if dc["dropped"] and rewards["card_drop"] is None:
+                rewards["card_drop"] = dc
+            rewards["xp_events"].append({"source": "mastery_new", "amount": 30, "message": ""})
+        student.cards = cards
+
+    # ---------- 宠物 XP 统一入账（每次 add_xp 返回升级信息并入事件） ----------
+    for ev in rewards["xp_events"]:
+        res = add_xp(pet, ev["amount"], source=ev["source"])
+        ev.update({k: res[k] for k in ("leveled_up", "new_level", "unlocked_skin", "new_exp")})
+    student.pet = pet
+    student.combo = combo
+    rewards["pet"] = pet
+    return rewards
 
 
 def check_error_detective(student: Student, q1: str, q2: str, error_type: str, topic_id: str = "") -> bool:

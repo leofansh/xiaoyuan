@@ -3,6 +3,9 @@ __pycache__/
 *.pyc
 .env
 data/students/
+data/config.json
+.playwright-mcp/
+.omo/
 .DS_Store
 .idea/
 .vscode/

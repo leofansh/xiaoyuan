@@ -62,7 +62,7 @@ def check_break_needed(student: Student) -> str | None:
     if load > 0.6 and minutes >= HIGH_LOAD_BREAK_MINUTES:
         return (
             "这几道题挺有挑战性的，大脑已经工作25分钟了！我们休息5分钟吧，"
-            "站起来走走，看看远处，让大脑充充电。回来我们再做最后一道～"
+            "站起来走走，看看远处，让大脑充充电。"
         )
     # 中等认知负荷：40分钟提醒
     if load > 0.3 and minutes >= MEDIUM_LOAD_BREAK_MINUTES:
@@ -70,11 +70,10 @@ def check_break_needed(student: Student) -> str | None:
             "已经学了40分钟了，做得很好！我们休息一下，喝口水，"
             "活动活动肩膀，伸个懒腰～"
         )
-    # 常规：60分钟强制提醒
+    # 常规：60分钟峰值结束话术
     if minutes >= LOW_LOAD_BREAK_MINUTES:
         return (
-            "今天已经学了60分钟了，非常棒！今天就到这里吧，明天继续。"
-            "记得每天坚持比一次学很久更有效哦。"
+            "今天到这里吧，留点悬念明天继续～每天坚持比一次学很久更有效。"
         )
     return None
 

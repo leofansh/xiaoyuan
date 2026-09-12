@@ -1,6 +1,6 @@
 {
-  "passed": 47,
-  "failed": 3,
+  "passed": 49,
+  "failed": 1,
   "total": 50,
   "results": [
     {
@@ -35,7 +35,7 @@
       "topic": "有理数混合运算",
       "domain": "代数",
       "question": "计算：(-1)^3 × 2 + (-3)^2",
-      "answer": "-2 + 9 = 7",
+      "answer": "7",
       "passed": true,
       "detail": "答案含 7，期望 7.0"
     },
@@ -134,7 +134,7 @@
       "topic": "绝对值",
       "domain": "代数",
       "question": "满足 |x - 2| = 3 的 x 值是什么？",
-      "answer": "x=-1, x=5",
+      "answer": "x=-1 或 x=5",
       "passed": true,
       "detail": "回答包含 5"
     },
@@ -170,9 +170,9 @@
       "topic": "幂运算",
       "domain": "代数",
       "question": "计算：(2^2)^3",
-      "answer": "8",
-      "passed": false,
-      "detail": "回答 8... 中无数字接近期望 64.0。提取数字: ['8']"
+      "answer": "64",
+      "passed": true,
+      "detail": "答案含 64，期望 64.0"
     },
     {
       "id": "S01",
@@ -206,18 +206,18 @@
       "topic": "不等式",
       "domain": "代数",
       "question": "解不等式：x + 3 > 7",
-      "answer": "x > 4",
+      "answer": "x>4",
       "passed": true,
-      "detail": "回答含不等式符号: x > 4"
+      "detail": "回答含不等式符号: x>4"
     },
     {
       "id": "I02",
       "topic": "不等式",
       "domain": "代数",
       "question": "解不等式：2x - 1 < 9",
-      "answer": "x < 5",
+      "answer": "x<5",
       "passed": true,
-      "detail": "回答含不等式符号: x < 5"
+      "detail": "回答含不等式符号: x<5"
     },
     {
       "id": "G01",
@@ -278,7 +278,7 @@
       "topic": "角度计算",
       "domain": "几何",
       "question": "一个直角三角形的两个锐角中一个角是 35°，另一个角是多少度？",
-      "answer": "55",
+      "answer": "55°",
       "passed": true,
       "detail": "回答数字接近 55"
     },
@@ -287,7 +287,7 @@
       "topic": "角度计算",
       "domain": "几何",
       "question": "一个等腰三角形的顶角是 80°，它的一个底角是多少度？",
-      "answer": "50",
+      "answer": "50°",
       "passed": true,
       "detail": "答案含 50，期望 50.0"
     },
@@ -386,9 +386,9 @@
       "topic": "因数与倍数",
       "domain": "数论",
       "question": "12 有几个因数？",
-      "answer": "12",
-      "passed": false,
-      "detail": "回答 12... 未包含期望值 ['6']"
+      "answer": "6",
+      "passed": true,
+      "detail": "回答包含 6"
     },
     {
       "id": "TH02",
@@ -449,7 +449,7 @@
       "topic": "综合应用",
       "domain": "代数",
       "question": "甲乙两人从相距 120 千米的两地相向而行，甲速度 40 千米/时，乙速度 20 千米/时，几小时后相遇？",
-      "answer": "2小时",
+      "answer": "2",
       "passed": true,
       "detail": "回答数字接近 2"
     }

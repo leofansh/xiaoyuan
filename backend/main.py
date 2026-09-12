@@ -1,6 +1,7 @@
 import json
 import logging
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
@@ -246,18 +247,167 @@ def delete_history_record(payload: HistoryDelete):
 
 
 class ApiKeyUpdate(BaseModel):
+    api_key: str = ""
+    pure_mode: bool | None = None  # V3.0 P0：纯学习模式开关（可单独提交）
+
+
+# ---------------------------------------------------------------------------
+# LLM 配置 Schemas（V3.0 多 LLM 支持）
+# ---------------------------------------------------------------------------
+
+class LLMConfigGetResponse(BaseModel):
+    current_provider: str
+    current_model: str
+    providers: list[dict]
+    custom_base_url: str = ""
+    custom_model: str = ""
+
+
+class LLMConfigUpdate(BaseModel):
+    provider: str
+    model: str
+    api_key: str = ""
+    base_url: str = ""
+
+
+class LLMTestRequest(BaseModel):
+    provider: str
+    model: str
     api_key: str
+    base_url: str = ""
+
+
+class LLMTestResponse(BaseModel):
+    success: bool
+    response: str = ""
+    error: str = ""
+
+
+@app.get("/api/llm/config")
+def get_llm_config():
+    """获取当前 LLM 配置。"""
+    from backend.config import LLM_PROVIDERS, get_current_provider, get_current_model, get_current_provider_id, get_custom_config
+
+    provider_id = get_current_provider_id()
+    provider = get_current_provider()
+    api_key = config.get_provider_api_key(provider_id)
+
+    providers_list = []
+    for pid, pdata in LLM_PROVIDERS.items():
+        has_key = bool(config.get_provider_api_key(pid))
+        providers_list.append({
+            "id": pid,
+            "name": pdata["name"],
+            "models": pdata["models"],
+            "free": pdata["free"],
+            "free_note": pdata.get("free_note", ""),
+            "supports_tools": pdata["supports_tools"],
+            "api_key_set": has_key,
+        })
+
+    custom = get_custom_config()
+    return LLMConfigGetResponse(
+        current_provider=provider_id,
+        current_model=get_current_model(),
+        providers=providers_list,
+        custom_base_url=custom["base_url"],
+        custom_model=custom["model"],
+    )
+
+
+@app.post("/api/llm/config")
+def update_llm_config(payload: LLMConfigUpdate):
+    """更新 LLM 配置（提供商、模型、API Key）。"""
+    from backend.config import set_llm_config, set_custom_config, LLM_PROVIDERS
+
+    provider_id = payload.provider
+    model = payload.model
+    api_key = payload.api_key
+    base_url = payload.base_url
+
+    if provider_id == "custom":
+        # 自定义提供商：保存 base_url 和 model
+        set_custom_config(base_url, model)
+        # 同时保存 API Key（如果有）
+        if api_key:
+            set_llm_config(provider_id, model, api_key)
+    else:
+        set_llm_config(provider_id, model, api_key)
+
+    return {"success": True, "current_provider": provider_id, "current_model": model}
+
+
+@app.post("/api/llm/test")
+async def test_llm_connection(payload: LLMTestRequest):
+    """测试 LLM 连接是否正常工作。"""
+    from backend.config import LLM_PROVIDERS
+
+    provider = payload.provider
+    model = payload.model
+    api_key = payload.api_key
+    base_url = payload.base_url
+
+    # 获取提供商的 base_url
+    if provider == "custom" and base_url:
+        target_base_url = base_url
+    elif provider in LLM_PROVIDERS:
+        target_base_url = LLM_PROVIDERS[provider]["base_url"]
+    else:
+        return LLMTestResponse(success=False, error="未知提供商")
+
+    if not target_base_url:
+        return LLMTestResponse(success=False, error="缺少 base_url")
+
+    try:
+        import uuid as _uuid
+
+        from openai import AsyncOpenAI
+
+        # OpenCode 免费网关要求：x-opencode-session（稳定会话 ID）+ 自有 User-Agent
+        default_headers: dict[str, str] = {}
+        if provider == "opencode_free":
+            default_headers = {
+                "x-opencode-session": _uuid.uuid4().hex,
+                "User-Agent": "xiaoyuan-tutor/1.0",
+            }
+        client = AsyncOpenAI(
+            api_key=api_key,
+            base_url=target_base_url,
+            timeout=15,
+            default_headers=default_headers or None,
+        )
+        response = await client.chat.completions.create(
+            model=model,
+            messages=[{"role": "system", "content": "你好，请简短回复确认连接正常。"}],
+            max_tokens=50,
+            stream=False,
+        )
+        text = response.choices[0].message.content or ""
+        return LLMTestResponse(success=True, response=text[:100])
+    except Exception as e:
+        err_msg = str(e)
+        if "401" in err_msg or "Unauthorized" in err_msg or "api_key" in err_msg.lower():
+            return LLMTestResponse(success=False, error="API Key 无效，请检查")
+        elif "429" in err_msg or "Rate limit" in err_msg:
+            return LLMTestResponse(success=False, error="当前模型使用人数较多，请稍后再试")
+        elif "connection" in err_msg.lower() or "network" in err_msg.lower() or "timeout" in err_msg.lower():
+            return LLMTestResponse(success=False, error="网络连接失败，请检查 URL 和网络设置")
+        return LLMTestResponse(success=False, error=f"连接失败：{type(e).__name__}: {err_msg[:100]}")
 
 
 @app.get("/api/config")
 def get_config():
     key = config.get_api_key()
     masked = (key[:7] + "****" + key[-4:]) if len(key) > 12 else ("****" if key else "")
-    return {"api_key_masked": masked, "has_key": bool(key)}
+    return {"api_key_masked": masked, "has_key": bool(key), "pure_mode": config.get_pure_mode()}
 
 
 @app.post("/api/config")
 def update_config(payload: ApiKeyUpdate):
+    # V3.0 P0：纯学习模式开关（可不带 API Key 单独提交）
+    if payload.pure_mode is not None:
+        config.set_pure_mode(payload.pure_mode)
+        return {"ok": True, "message": "纯学习模式已更新"}
     key = payload.api_key.strip()
     if not key:
         raise HTTPException(status_code=400, detail="API Key 不能为空")
@@ -578,6 +728,576 @@ def get_cognitive_profile(student_id: str = ""):
         "assessed_at": cp.assessed_at,
         "assessment_confidence": cp.assessment_confidence,
     }
+
+
+# ---------------------------------------------------------------------------
+# V3.0 P1：宠物 / 卡片 / Combo / 输出>输入 API（规格 §3/§4/§5/§11.3）
+# ---------------------------------------------------------------------------
+
+class PetFeedRequest(BaseModel):
+    xp_amount: int = 20
+    source: str = "session_complete"
+    message: str = ""
+
+
+class PetSkinRequest(BaseModel):
+    skin_id: str
+
+
+class PetRenameRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=10)
+
+
+class CardDropRequest(BaseModel):
+    source: str = "mastery"
+    knowledge_node: str = ""
+    guaranteed: bool = False
+
+
+class CardExchangeRequest(BaseModel):
+    skin_id: str
+    cost: int
+
+
+class TeachRequest(BaseModel):
+    content: str = Field(min_length=1, max_length=2000)
+    topic_id: str = ""
+
+
+class ProblemCreateRequest(BaseModel):
+    problem: str = Field(min_length=1, max_length=1000)
+    answer: str = ""
+    judge: bool = True  # 孩子自己判：小圆答得对不对
+
+
+def _pet_view(student: Student) -> dict:
+    """宠物视图：实时心情 + 心情话术（规格 3.3.1）。"""
+    from backend.services.pet import compute_mood, ensure_pet
+
+    pet = ensure_pet(student.pet)
+    mood, mood_message = compute_mood(pet)
+    level_up_available = pet.get("exp", 0) >= pet.get("exp_to_next", 1)
+    return {
+        "pet": pet,
+        "level_up_available": level_up_available,
+        "mood_message": mood_message,
+    }
+
+
+@app.get("/api/pet/{student_id}")
+def pet_get(student_id: str):
+    """3.3.1 获取宠物状态。"""
+    s = _load_student(student_id)
+    return _pet_view(s)
+
+
+@app.post("/api/pet/{student_id}/feed")
+async def pet_feed(student_id: str, payload: PetFeedRequest):
+    """3.3.2 喂养宠物（学习后自动调用，也可手动）。"""
+    from backend.services.pet import add_xp, ensure_pet
+
+    storage = get_storage()
+    lock = storage.get_lock(student_id)
+    async with lock:
+        s = _load_student(student_id)
+        s.pet = ensure_pet(s.pet)
+        res = add_xp(s.pet, payload.xp_amount, source=payload.source, message=payload.message)
+        storage.save(s)
+        return res
+
+
+@app.post("/api/pet/{student_id}/skin")
+async def pet_skin(student_id: str, payload: PetSkinRequest):
+    """3.3.3 更换皮肤。"""
+    from backend.services.pet import ensure_pet, set_skin
+
+    storage = get_storage()
+    lock = storage.get_lock(student_id)
+    async with lock:
+        s = _load_student(student_id)
+        s.pet = ensure_pet(s.pet)
+        try:
+            result = set_skin(s.pet, payload.skin_id)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        storage.save(s)
+        return result
+
+
+@app.post("/api/pet/{student_id}/rename")
+async def pet_rename(student_id: str, payload: PetRenameRequest):
+    """3.3.4 重命名宠物。"""
+    from backend.services.pet import ensure_pet, rename
+
+    storage = get_storage()
+    lock = storage.get_lock(student_id)
+    async with lock:
+        s = _load_student(student_id)
+        s.pet = ensure_pet(s.pet)
+        result = rename(s.pet, payload.name)
+        storage.save(s)
+        return result
+
+
+@app.get("/api/pet/{student_id}/interact")
+def pet_interact(student_id: str):
+    """3.3.5 宠物互动（点击触发随机语音）。"""
+    from backend.services.pet import compute_mood, ensure_pet, interact_message
+
+    s = _load_student(student_id)
+    pet = ensure_pet(s.pet)
+    compute_mood(pet)
+    message, animation = interact_message(pet)
+    return {"message": message, "animation": animation}
+
+
+@app.get("/api/cards/library")
+def cards_library():
+    """4.3.1 获取卡片库（全部卡片定义）。"""
+    from backend.knowledge.cards import all_cards
+
+    cards = all_cards()
+    return {"cards": cards, "total": len(cards)}
+
+
+@app.get("/api/cards/{student_id}")
+def cards_get(student_id: str):
+    """4.3.2 获取学生已收集卡片。"""
+    from backend.knowledge.cards import completion_rate, ensure_cards
+
+    s = _load_student(student_id)
+    cards = ensure_cards(s.cards)
+    return {**cards, "completion_rate": completion_rate(cards)}
+
+
+@app.post("/api/cards/{student_id}/drop")
+async def cards_drop(student_id: str, payload: CardDropRequest):
+    """4.3.3 卡片掉落（后端内部调用为主，也提供手动测试接口）。"""
+    from backend.knowledge.cards import drop_card, ensure_cards
+
+    storage = get_storage()
+    lock = storage.get_lock(student_id)
+    async with lock:
+        s = _load_student(student_id)
+        cards = ensure_cards(s.cards)
+        result = drop_card(
+            cards,
+            source=payload.source,
+            knowledge_node=payload.knowledge_node,
+            guaranteed=payload.guaranteed,
+        )
+        s.cards = cards
+        storage.save(s)
+        return result
+
+
+@app.post("/api/cards/{student_id}/exchange")
+async def cards_exchange(student_id: str, payload: CardExchangeRequest):
+    """4.3.4 星光值兑换皮肤。"""
+    from backend.knowledge.cards import ensure_cards, exchange_skin
+
+    storage = get_storage()
+    lock = storage.get_lock(student_id)
+    async with lock:
+        s = _load_student(student_id)
+        cards = ensure_cards(s.cards)
+        try:
+            result = exchange_skin(cards, payload.skin_id, payload.cost)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        s.cards = cards
+        # 兑换成功的皮肤写入宠物
+        from backend.services.pet import ensure_pet
+        pet = ensure_pet(s.pet)
+        if payload.skin_id not in pet["unlocked_skins"]:
+            pet["unlocked_skins"].append(payload.skin_id)
+        s.pet = pet
+        storage.save(s)
+        return result
+
+
+@app.get("/api/combo/{student_id}")
+def combo_get(student_id: str):
+    """5.4 获取 Combo 状态。"""
+    s = _load_student(student_id)
+    combo = s.combo or {}
+    return {
+        "current": combo.get("current", 0),
+        "best_all_time": combo.get("best_all_time", 0),
+        "best_this_week": combo.get("best_this_week", 0),
+        "total_combos_5": combo.get("total_combos_5", 0),
+        "total_combos_10": combo.get("total_combos_10", 0),
+    }
+
+
+@app.post("/api/teach/{student_id}")
+async def teach_submit(student_id: str, payload: TeachRequest):
+    """11.3 教宠物/小圆：提交讲解内容，评价 + 讲对宠物+50XP。"""
+    from backend.services.pet import add_xp, ensure_pet
+
+    storage = get_storage()
+    lock = storage.get_lock(student_id)
+    async with lock:
+        s = _load_student(student_id)
+        content = payload.content.strip()
+
+        # 启发式质量评价：讲解有长度且有数学痕迹即视为"用心讲对"
+        math_hits = sum(kw in content for kw in ("因为", "所以", "先", "然后", "等于", "=", "步", "分", "公式", "定义"))
+        quality = min(1.0, 0.4 + len(content) / 300 + math_hits * 0.1)
+
+        now = datetime.now().isoformat(timespec="seconds")
+        s.creations.append({
+            "type": "teach",
+            "content": content[:500],
+            "topic_id": payload.topic_id,
+            "quality": round(quality, 2),
+            "created_at": now,
+        })
+
+        pet_feed_result = None
+        if quality >= 0.5:
+            s.pet = ensure_pet(s.pet)
+            pet_feed_result = add_xp(s.pet, 50, source="teach_pet")
+
+        storage.save(s)
+        feedback = (
+            "讲得真清楚！你是小老师的料～"
+            if quality >= 0.7 else
+            "嗯，思路有了！再试试把'为什么'也说出来？"
+        )
+        return {
+            "success": True,
+            "quality": round(quality, 2),
+            "feedback": feedback,
+            "pet_feed": {
+                k: pet_feed_result[k]
+                for k in ("xp_gained", "new_exp", "leveled_up", "new_level", "unlocked_skin")
+            } if pet_feed_result else None,
+        }
+
+
+@app.post("/api/problems/{student_id}/create")
+async def problem_create(student_id: str, payload: ProblemCreateRequest):
+    """11.3 孩子出题：入'我的题库'，奖励XP+卡片。"""
+    from backend.knowledge.cards import drop_card, ensure_cards
+    from backend.services.pet import add_xp, ensure_pet
+
+    storage = get_storage()
+    lock = storage.get_lock(student_id)
+    async with lock:
+        s = _load_student(student_id)
+        now = datetime.now().isoformat(timespec="seconds")
+        s.creations.append({
+            "type": "problem",
+            "problem": payload.problem[:500],
+            "answer": payload.answer[:200],
+            "judged_correct": payload.judge,
+            "created_at": now,
+        })
+
+        # 出题 +10 XP + 概率掉卡
+        s.pet = ensure_pet(s.pet)
+        pet_feed = add_xp(s.pet, 10, source="problem_create")
+        card_drop = None
+        cards = ensure_cards(s.cards)
+        dc = drop_card(cards, source="problem_create")
+        s.cards = cards
+        if dc["dropped"]:
+            card_drop = dc
+
+        storage.save(s)
+        return {
+            "success": True,
+            "pet_feed": {
+                k: pet_feed[k]
+                for k in ("xp_gained", "new_exp", "leveled_up", "new_level", "unlocked_skin")
+            },
+            "card_drop": card_drop,
+            "creations_count": len(s.creations),
+        }
+
+
+@app.get("/api/creations/{student_id}")
+def creations_get(student_id: str):
+    """11.3 作品展示墙：获取创造产物列表。"""
+    s = _load_student(student_id)
+    return {"creations": list(reversed(s.creations or []))}
+
+
+# ---------------------------------------------------------------------------
+# V3.0 P2：模块 D 闯关冒险地图 + 模块 E/F PBL（规格 6 / 7 / 8）
+# ---------------------------------------------------------------------------
+
+class AdventureEnter(BaseModel):
+    level_id: str = ""
+
+
+class AdventureComplete(BaseModel):
+    level_id: str = ""
+
+
+class PblEnter(BaseModel):
+    student_id: str = ""
+    level_id: int = 1
+
+
+class PblComplete(BaseModel):
+    student_id: str = ""
+    level_id: int = 1
+    score: float = 0.0
+    hit: bool = False
+    attempts: int = 1
+    simulator_data: dict = {}
+
+
+class CustomProjectCreate(BaseModel):
+    name: str = ""
+    origin_interest: str = ""
+    steps: list[dict] = []
+    notes: str = ""
+
+
+class CustomProjectStepUpdate(BaseModel):
+    status: str = "done"
+
+
+class CustomProjectStatusUpdate(BaseModel):
+    status: str = "in_progress"
+
+
+@app.get("/api/adventure/{student_id}")
+def adventure_get(student_id: str):
+    """6.3.1 冒险大地图：大陆分组 + 关卡状态 + 进度。"""
+    from backend.knowledge.adventure_levels import ADVENTURE_LEVELS, CONTINENT_ORDER
+    from backend.knowledge.cards import CARD_LIBRARY
+    from backend.services.adventure_service import ensure_adventure, is_level_unlocked
+
+    s = _load_student(student_id)
+    adv = ensure_adventure(s.adventure_map)
+    completed = set(adv.get("completed_levels", []))
+    stars_map = adv.get("stars", {})
+
+    continents = []
+    for cname in CONTINENT_ORDER:
+        levels = sorted(
+            (lv for lv in ADVENTURE_LEVELS.values() if lv["continent"] == cname),
+            key=lambda lv: lv["order"],
+        )
+        if not levels:
+            continue
+        c_completed = 0
+        c_stars = 0
+        c_stars_max = 0
+        items = []
+        for lv in levels:
+            lid = lv["id"]
+            rw = lv.get("rewards", {}) or {}
+            card_id = rw.get("card")
+            rarity = CARD_LIBRARY[card_id]["rarity"] if card_id and card_id in CARD_LIBRARY else None
+            stars = stars_map.get(lid, 0)
+            stars_max = rw.get("stars_max", 3)
+            if lid in completed:
+                status = "completed"
+                c_completed += 1
+                c_stars += stars
+            elif is_level_unlocked(lv, adv):
+                status = "available"
+            else:
+                status = "locked"
+            c_stars_max += stars_max
+            items.append({
+                "id": lid,
+                "name": lv["name"],
+                "order": lv["order"],
+                "type": lv["type"],
+                "status": status,
+                "stars": stars,
+                "stars_max": stars_max,
+                "rewards_preview": {
+                    "xp": rw.get("xp", 0),
+                    "card_rarity": rarity,
+                    "badge": rw.get("badge"),
+                },
+            })
+        continents.append({
+            "name": cname,
+            "levels": items,
+            "progress": {
+                "completed": c_completed,
+                "total": len(items),
+                "stars": c_stars,
+                "stars_max": c_stars_max,
+            },
+        })
+
+    return {
+        "continents": continents,
+        "current_continent": adv.get("current_continent", CONTINENT_ORDER[0]),
+        "total_stars": adv.get("total_stars", 0),
+    }
+
+
+@app.post("/api/adventure/{student_id}/enter")
+def adventure_enter(student_id: str, payload: AdventureEnter):
+    """6.3.2 进入关卡（校验解锁，返回关卡定义 + 开场白）。"""
+    from backend.knowledge.adventure_levels import get_level
+    from backend.knowledge.syllabus import BY_ID
+    from backend.services.adventure_service import ensure_adventure, is_level_unlocked
+
+    s = _load_student(student_id)
+    adv = ensure_adventure(s.adventure_map)
+    level = get_level(payload.level_id)
+    if level is None:
+        return {"success": False, "can_enter": False, "reason": f"关卡 {payload.level_id} 不存在"}
+    if not is_level_unlocked(level, adv):
+        return {"success": False, "can_enter": False, "reason": "这关还没解锁，先完成前面的关卡收集星星吧～"}
+    node = BY_ID.get(level["knowledge_node"])
+    node_name = node.name if node else level["knowledge_node"]
+    return {
+        "success": True,
+        "can_enter": True,
+        "level": level,
+        "intro_message": f"欢迎来到「{level['name']}」！这一关我们要攻克「{node_name}」，准备好了吗？",
+    }
+
+
+@app.post("/api/adventure/{student_id}/complete")
+async def adventure_complete(student_id: str, payload: AdventureComplete):
+    """6.3.3 完成关卡（掌握度达标判定 → 星级 → 奖励 → 解锁传播）。"""
+    from backend.services.adventure_service import try_complete_level
+
+    storage = get_storage()
+    lock = storage.get_lock(student_id)
+    async with lock:
+        s = _load_student(student_id)
+        result = try_complete_level(s, payload.level_id)
+        if result.get("success"):
+            storage.save(s)
+        return result
+
+
+@app.get("/api/pbl/projects")
+def pbl_projects_list(student_id: str = ""):
+    """7.3.1 PBL 项目列表 + 兴趣推荐。"""
+    from backend.pbl.pbl_service import ensure_pbl, list_projects
+
+    s = _load_student(student_id)
+    s.pbl_projects = ensure_pbl(s.pbl_projects)
+    return list_projects(s)
+
+
+@app.get("/api/pbl/projects/{project_id}")
+def pbl_project_detail(project_id: str, student_id: str = ""):
+    """7.3.2 项目详情 + 进度。"""
+    from backend.pbl.pbl_service import ensure_pbl, get_project_detail
+
+    s = _load_student(student_id)
+    s.pbl_projects = ensure_pbl(s.pbl_projects)
+    detail = get_project_detail(s, project_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    return detail
+
+
+@app.post("/api/pbl/projects/{project_id}/enter")
+async def pbl_enter(project_id: str, payload: PblEnter):
+    """7.3.3 进入项目关卡。"""
+    from backend.pbl.pbl_service import ensure_pbl, enter_level
+
+    sid = payload.student_id or ""
+    if not sid:
+        raise HTTPException(status_code=400, detail="缺少 student_id")
+    storage = get_storage()
+    lock = storage.get_lock(sid)
+    async with lock:
+        s = _load_student(sid)
+        s.pbl_projects = ensure_pbl(s.pbl_projects)
+        result = enter_level(s, project_id, payload.level_id)
+        if result.get("success"):
+            storage.save(s)
+        return result
+
+
+@app.post("/api/pbl/projects/{project_id}/complete")
+async def pbl_complete(project_id: str, payload: PblComplete):
+    """7.3.4 完成关卡（命中判定 → 星级 → 奖励 → 知识回溯）。"""
+    from backend.pbl.pbl_service import complete_level, ensure_pbl
+
+    sid = payload.student_id or ""
+    if not sid:
+        raise HTTPException(status_code=400, detail="缺少 student_id")
+    storage = get_storage()
+    lock = storage.get_lock(sid)
+    async with lock:
+        s = _load_student(sid)
+        s.pbl_projects = ensure_pbl(s.pbl_projects)
+        result = complete_level(s, project_id, payload.level_id, payload.score, payload.hit, payload.attempts)
+        if result.get("success"):
+            storage.save(s)
+        return result
+
+
+@app.get("/api/pbl/projects/{project_id}/levels/{level_id}/knowledge")
+def pbl_knowledge(project_id: str, level_id: int, student_id: str = ""):
+    """8.6 知识回溯：知识点 + 掌握度前后对比。"""
+    from backend.pbl.pbl_service import project_knowledge
+
+    s = _load_student(student_id)
+    return project_knowledge(s, project_id, level_id)
+
+
+@app.post("/api/custom-projects/{student_id}")
+async def custom_project_create(student_id: str, payload: CustomProjectCreate):
+    """9.4.1 创建共创项目（第 4 步完成后调用）。"""
+    from backend.pbl.co_creation import create_custom_project
+
+    storage = get_storage()
+    lock = storage.get_lock(student_id)
+    async with lock:
+        s = _load_student(student_id)
+        result = create_custom_project(s, payload.name, payload.origin_interest, payload.steps, payload.notes)
+        if result.get("success"):
+            storage.save(s)
+        return result
+
+
+@app.get("/api/custom-projects/{student_id}")
+def custom_projects_list(student_id: str):
+    """9.4.2 获取共创项目列表。"""
+    from backend.pbl.co_creation import list_custom_projects
+
+    s = _load_student(student_id)
+    return list_custom_projects(s)
+
+
+@app.post("/api/custom-projects/{student_id}/{project_id}/steps/{step_id}")
+async def custom_project_step_update(student_id: str, project_id: str, step_id: int, payload: CustomProjectStepUpdate):
+    """9.4.3 更新共创项目步骤状态（标记 done 后解锁下一步）。"""
+    from backend.pbl.co_creation import update_step_status
+
+    storage = get_storage()
+    lock = storage.get_lock(student_id)
+    async with lock:
+        s = _load_student(student_id)
+        result = update_step_status(s, project_id, step_id, payload.status)
+        if result.get("success"):
+            storage.save(s)
+        return result
+
+
+@app.post("/api/custom-projects/{student_id}/{project_id}/status")
+async def custom_project_status_update(student_id: str, project_id: str, payload: CustomProjectStatusUpdate):
+    """9.4.4 更新共创项目状态（完成/放弃/进行中）。"""
+    from backend.pbl.co_creation import update_project_status
+
+    storage = get_storage()
+    lock = storage.get_lock(student_id)
+    async with lock:
+        s = _load_student(student_id)
+        result = update_project_status(s, project_id, payload.status)
+        if result.get("success"):
+            storage.save(s)
+        return result
 
 
 # ---------------------------------------------------------------------------

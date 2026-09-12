@@ -1,12 +1,15 @@
 """对话管理：会话生命周期 + 上下文组装 + 时间感知收尾。"""
 
 import asyncio
+import logging
 from datetime import datetime
 from typing import AsyncGenerator
 
+logger = logging.getLogger(__name__)
+
 from backend.agent import assessment, persona
 from backend.agent.metacognition import detect_strategy, get_strategy_prompt
-from backend.config import MAX_HISTORY_MESSAGES, SESSION_DEEP_MINUTES
+from backend.config import MAX_HISTORY_MESSAGES, SESSION_DEEP_MINUTES, get_pure_mode
 from backend.models.student import Badge, SessionSummary, Student, StudentProfile
 from backend.services import llm
 from backend.services.content_filter import filter_llm_output
@@ -39,8 +42,42 @@ def start_session(student: Student, mood: str) -> dict:
     suggestion = {"😊": "A", "😐": "A或B", "😣": "B"}.get(mood, "A")
     # V-P1-4：使用个性化开场白（引用学生兴趣）
     opening = personalized_opening(mood, student)
+    # V3.0 P0: 轻量首学模式标记 + 兴趣问题（纯学习模式下关闭娱乐化功能）
+    pure_mode = get_pure_mode()
+    if not pure_mode:
+        if not student.session_history or student.total_sessions == 0:
+            sess.lightweight_mode = True
+        # V3.0 P0: 从兴趣引出第一个数学问题
+        if student.interests:
+            try:
+                from backend.services.interest_extractor import get_opening_problem
+                opening_problem = get_opening_problem(student.interests[0])
+                if opening_problem:
+                    opening += f"\n\n对了，我有个有趣的问题想请教你：{opening_problem}"
+            except ImportError:
+                pass
+        # V3.0 P2/I-11.5：开场好奇心钩子（悬念化开局，铺垫当天主题）
+        try:
+            from backend.agent.persona import pick_opening_hook
+            hook = pick_opening_hook()
+            if hook:
+                opening = f"✨ {hook}\n\n{opening}"
+        except ImportError:
+            pass
     if student.week_baseline_count >= 4:
         opening += "（悄悄说：这周我们都在充电呀，明天状态好的话来个小挑战？）"
+
+    # V3.0 P1：开场注入宠物心情话术（规格3.5·集成点：chat.py 开场时注入宠物心情话术）
+    if not pure_mode:
+        try:
+            from backend.services.pet import compute_mood, ensure_pet, interact_message
+            pet = ensure_pet(student.pet)
+            compute_mood(pet)  # 实时心情
+            pet_msg, _anim = interact_message(pet, scene="开场")
+            if pet_msg:
+                opening += f"\n\n🐾 {pet_msg}"
+        except ImportError:
+            pass
 
     # 检查是否有待复习内容
     due_reviews = get_due_reviews(student)
@@ -115,6 +152,26 @@ async def process_message(
     storage = get_storage()
     sess = student.current_session
 
+    # V3.0 P0: 顿悟时刻检测（纯学习模式下关闭）
+    insight = None
+    pure_mode = get_pure_mode()
+    if not pure_mode:
+        try:
+            from backend.services.insight_detector import detect_insight
+            insight = detect_insight(user_message, sess.history)
+            if insight and insight.confidence >= 0.7:
+                sess.insight_today = getattr(sess, 'insight_today', 0) + 1
+                student.insights["total_count"] += 1
+                student.insights["history"].append({
+                    "timestamp": datetime.now().isoformat(timespec="seconds"),
+                    "type": insight.insight_type,
+                    "quote": insight.student_quote[:100],
+                    "knowledge_node": sess.topic_id,
+                    "xp_reward": 100,
+                })
+        except ImportError:
+            pass
+
     # 【最高优先级】心理危机检测（SAFE-P0-1 + V-P1-1 修复误判）
     # 计算连续消极轮次（用于中度词判断，避免"好累"等日常词误触发）
     recent_user = [m["content"] for m in sess.history[-6:] if m.get("role") == "user"]
@@ -152,8 +209,49 @@ async def process_message(
     if sess.state == "BLIND_SPOT" and user_message and "不知道" not in user_message[:6]:
         assessment.record_blind_spot(student, user_message)
 
+    # V3.0 P3 模块G：共创模式——已进入共创流程时走解释性状态机（不进 LLM 教学循环）
+    from backend.pbl.co_creation import advance_co_creation, is_co_creation_state, step_from_state
+    if is_co_creation_state(sess.state):
+        result = advance_co_creation(step_from_state(sess.state), user_message or "")
+        sess.state = result["state"]
+        sess.history.append({"role": "user", "content": user_message})
+        sess.history.append({"role": "assistant", "content": result["reply"]})
+        storage.save(student)
+        yield {"type": "text", "content": result["reply"]}
+        yield {
+            "type": "eval",
+            "state": sess.state,
+            "badges": [],
+            "progress": None,
+            "emotion": None,
+            "metacognition": "none",
+            "anxiety": "low",
+            "co_creation": True,
+        }
+        return
+
     # V-P0-3：模式对话引导——在 MODE_SELECT 状态，从学生文字回复自动识别模式意图
     if sess.state == "MODE_SELECT" and user_message:
+        # V3.0 P3 模块G：共创意图识别（优先于模式选择）——把对话引向共创
+        from backend.pbl.co_creation import detect_co_creation_intent, start_co_creation
+        if detect_co_creation_intent(user_message):
+            flow = start_co_creation(user_message)
+            sess.state = flow["state"]
+            sess.history.append({"role": "user", "content": user_message})
+            sess.history.append({"role": "assistant", "content": flow["reply"]})
+            storage.save(student)
+            yield {"type": "text", "content": flow["reply"]}
+            yield {
+                "type": "eval",
+                "state": sess.state,
+                "badges": [],
+                "progress": None,
+                "emotion": None,
+                "metacognition": "none",
+                "anxiety": "low",
+                "co_creation": True,
+            }
+            return
         detected_mode = _detect_mode_intent(user_message)
         if detected_mode:
             select_mode(student, detected_mode)
@@ -169,6 +267,12 @@ async def process_message(
                 "anxiety": "low",
             }
             return
+        # V3.0 P0：孩子表达学习意图（但未明确模式）→ 提示前端展示模式快捷栏
+        # 轻量首学模式期间不弹出（前10分钟自然聊天，10.3.4）
+        if not getattr(getattr(student, 'current_session', None), 'lightweight_mode', False) and any(
+            k in user_message for k in ["学", "做", "开始", "来一道", "题", "试试", "练", "讲"]
+        ):
+            yield {"type": "mode_hint", "content": "show"}
 
     system_prompt = persona.build_system_prompt(student)
 
@@ -187,6 +291,17 @@ async def process_message(
 
     if _check_time_wrap(student):
         extras.append("[系统提示：本次深度会话时间已到15分钟，请立即自然收尾总结，进入WRAP_UP]")
+    # V3.0 P0: 轻量首学模式 → 正常模式
+    if getattr(sess, 'lightweight_mode', False):
+        if sess.turn_count >= 15:
+            sess.lightweight_mode = False
+            extras.append("[系统提示：轻量首学模式已满15轮，自然过渡到正常学习模式]")
+        elif sess.started_at:
+            started = datetime.fromisoformat(sess.started_at)
+            elapsed = (datetime.now() - started).total_seconds() / 60
+            if elapsed >= 10:
+                sess.lightweight_mode = False
+                extras.append("[系统提示：轻量首学模式已满10分钟，自然过渡到正常学习模式]")
     if user_message and any(
         k in user_message for k in ["累", "烦", "不想学", "好难", "不学", "不想", "休息", "玩会", "玩一会"]
     ):
@@ -323,10 +438,45 @@ async def process_message(
         yield {"type": "text", "content": reply_text[i : i + 3]}
         await asyncio.sleep(0.01)
 
+    # V3.0 P0: 顿悟时刻庆祝 SSE（纯学习模式下关闭）
+    if not pure_mode and insight and insight.confidence >= 0.7:
+        yield {
+            "type": "insight",
+            "insight_type": insight.insight_type,
+            "student_quote": insight.student_quote[:100],
+            "xp_reward": 100,
+            "effect": "golden_burst",
+        }
+
     new_badges: list[str] = []
     if eval_data:
         new_badges.extend(assessment.apply_eval(student, eval_data))
         state_now = student.current_session.state
+
+        # V3.0 P1：推送游戏化奖励 SSE（combo_update / card_drop / pet_feed）
+        p1 = assessment.pop_p1_rewards()
+        if p1.get("combo"):
+            yield {"type": "combo_update", "data": p1["combo"]}
+        if p1.get("card_drop"):
+            yield {
+                "type": "card_drop",
+                "data": {
+                    **_drop_payload(p1["card_drop"]),
+                    "combo": (p1.get("combo") or {}).get("current", 0),
+                },
+            }
+        if p1.get("xp_events"):
+            yield {
+                "type": "pet_feed",
+                "data": {
+                    "events": p1["xp_events"],
+                    "pet": _pet_payload(p1.get("pet")),
+                },
+            }
+
+        # V3.0 P2 模块D：冒险自动通关 SSE（规格 6.3.3，掌握度达标自动判定）
+        for adv in assessment.pop_adventure_completions():
+            yield {"type": "level_complete", "data": adv}
 
         # 从 eval 自动识别当前主题（优先 mastery_updates，其次 gaps_found/gaps_cleared）
         if not sess.topic_id:
@@ -377,6 +527,36 @@ async def process_message(
         "anxiety": (eval_data or {}).get("anxiety_level", "low"),
         "used_thinking_model": (eval_data or {}).get("used_thinking_model"),
         "student_initiated_model": (eval_data or {}).get("student_initiated_model"),
+    }
+
+
+def _drop_payload(dc: dict) -> dict:
+    """卡片掉落事件 → SSE 载荷（剔除内部字段）。"""
+    card = dict(dc.get("card") or {})
+    return {
+        "card": card,
+        "is_new": dc.get("is_new", False),
+        "duplicate_count": dc.get("duplicate_count", 0),
+        "starlight_gained": dc.get("starlight_gained", 0),
+        "starlight_total": dc.get("starlight_total", 0),
+        "source": dc.get("source", ""),
+    }
+
+
+def _pet_payload(pet: dict | None) -> dict:
+    """宠物对象 → SSE 载荷（实时计算心情）。"""
+    if not pet:
+        return {}
+    from backend.services.pet import compute_mood
+    mood, _ = compute_mood(pet)
+    return {
+        "species": pet.get("species", "egg"),
+        "name": pet.get("name", "小蛋蛋"),
+        "level": pet.get("level", 1),
+        "exp": pet.get("exp", 0),
+        "exp_to_next": pet.get("exp_to_next", 100),
+        "mood": mood,
+        "current_skin": pet.get("current_skin", "default"),
     }
 
 
@@ -444,6 +624,46 @@ def end_session(student: Student) -> dict:
     }
 
     student.total_sessions += 1
+
+    # V3.0 P1：会话结束喂宠物（规格3.2：≥3轮 +20 XP）+ combo 归零保留最佳（规格5.3）
+    turns = student.current_session.turn_count
+    pet_feed_result = None
+    from backend.services.pet import add_xp, ensure_pet
+    if not get_pure_mode() and turns >= 3:
+        student.pet = ensure_pet(student.pet)
+        pet_feed_result = add_xp(student.pet, 20, source="session_complete")
+        # 累计学习分钟数（粗估）
+        student.pet["total_study_minutes"] = student.pet.get("total_study_minutes", 0) + (
+            1 if turns < 5 else min(turns // 2, 30)
+        )
+    if student.combo:
+        student.combo["current"] = 0  # 会话结束归零，历史最佳保留
+        from datetime import datetime as _dt2
+        iso_year, iso_week_n, _ = _dt2.now().isocalendar()
+        student.combo["week_key"] = f"{iso_year}-W{iso_week_n:02d}"
+    summary["pet_feed"] = {
+        k: pet_feed_result[k] for k in ("xp_gained", "new_exp", "leveled_up", "new_level", "unlocked_skin")
+    } if pet_feed_result else None
+    summary["combo"] = {
+        "current": student.combo.get("current", 0) if student.combo else 0,
+        "best_all_time": student.combo.get("best_all_time", 0) if student.combo else 0,
+        "best_this_week": student.combo.get("best_this_week", 0) if student.combo else 0,
+    }
+
+    # V3.0 P0: 每日思考题（会话结束时留一道，纯学习模式下关闭）
+    if not get_pure_mode() and not student.insights.get("current_thinking_problem"):
+        try:
+            from backend.knowledge.challenge_problems import get_random_challenge
+            tp = get_random_challenge(max_difficulty=2)
+            if tp:
+                student.insights["current_thinking_problem"] = {
+                    "id": tp.id,
+                    "question": tp.question,
+                    "given_at": datetime.now().isoformat(timespec="seconds"),
+                    "solved": False,
+                }
+        except ImportError:
+            pass
     student.current_session = type(student.current_session)()  # 重置为空会话
     update_student_profile(student)
 
@@ -467,6 +687,22 @@ def end_session(student: Student) -> dict:
     # 保持日志不超过50条
     if len(student.teaching_journal) > 50:
         student.teaching_journal = student.teaching_journal[-50:]
+
+    # V3.0 P2/I-11.5+I-11.7：结尾悬念 + 数学趣闻可变奖励 + 小圆故事线推进（纯学习模式关闭）
+    if not get_pure_mode():
+        try:
+            from backend.agent.persona import fun_fact_unlock, pick_closing_hook, story_reveal
+            closing_hook = pick_closing_hook()
+            if closing_hook:
+                summary["closing_hook"] = closing_hook
+            fact = fun_fact_unlock(student)
+            if fact:
+                summary["fun_fact"] = fact
+            story = story_reveal(student)
+            if story:
+                summary["story_reveal"] = story
+        except ImportError:
+            pass
 
     storage.save(student)
     return summary

@@ -1,0 +1,399 @@
+/* ============================================================
+   V3.0 P2 · 模块 D 闯关冒险地图样式 (adventure.css) —— 规格 6.4
+   主题跟随：全部颜色走 style.css 的 CSS 变量，不硬编码主题色
+   ============================================================ */
+
+/* ---------------- 冒险地图容器卡片 ---------------- */
+.adventure-section {
+  margin-top: 22px;
+  padding: 18px 16px;
+  background: rgba(255, 255, 255, .72);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  border: 1.5px solid var(--light);
+  box-shadow: var(--soft-shadow);
+}
+
+/* ---------------- 汇总条 ---------------- */
+.adv-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: var(--chip-bg);
+  border-radius: 14px;
+  padding: 10px 14px;
+  margin: 10px 0 14px;
+}
+.adv-total-stars {
+  font-size: 15px;
+  font-weight: 700;
+  color: #c9a227;
+}
+.adv-total-stars b { font-size: 17px; }
+.adv-summary-hint {
+  font-size: 12px;
+  color: var(--muted);
+  flex: 1;
+  text-align: right;
+}
+
+/* ---------------- 大陆切换条（ContinentSelector） ---------------- */
+.adv-continent-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 2px 10px;
+  scrollbar-width: thin;
+}
+.adv-tab {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 9px 18px;
+  border: 1.5px solid var(--light);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--chip-text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all .2s;
+}
+.adv-tab:hover { border-color: var(--main); transform: translateY(-1px); }
+.adv-tab.active {
+  background: linear-gradient(135deg, var(--main), var(--main-strong));
+  color: #fff;
+  border-color: transparent;
+  box-shadow: var(--soft-shadow);
+}
+
+/* ---------------- 大陆进度条 ---------------- */
+.adv-progress {
+  margin: 6px 2px 16px;
+}
+.adv-progress-bar {
+  height: 12px;
+  background: var(--light);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.adv-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--main), var(--accent));
+  border-radius: 999px;
+  transition: width .5s ease;
+}
+.adv-progress-text {
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.adv-progress-text b { color: var(--accent); }
+
+/* ---------------- 关卡节点流（LevelNode）+ 连线 ---------------- */
+.adv-levels {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  overflow-x: auto;
+  padding: 10px 4px 14px;
+  scrollbar-width: thin;
+}
+.adv-level {
+  position: relative;
+  flex: 0 0 auto;
+  padding-right: 34px;
+}
+.adv-level:last-child { padding-right: 0; }
+/* 节点间路径连线（伪元素） */
+.adv-level::after {
+  content: "";
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  width: 22px;
+  height: 3px;
+  transform: translateY(-50%);
+  background: var(--light);
+  border-radius: 2px;
+}
+.adv-level:last-child::after { display: none; }
+.adv-level.adv-status-available::after,
+.adv-level.adv-status-completed::after {
+  background: linear-gradient(90deg, var(--main), var(--accent));
+}
+
+.adv-node {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 104px;
+  min-height: 108px;
+  padding: 10px 8px;
+  border: 2px solid var(--light);
+  border-radius: 18px;
+  background: #fff;
+  cursor: pointer;
+  text-align: center;
+  transition: transform .18s, box-shadow .18s, border-color .18s;
+}
+.adv-node:not(:disabled):hover {
+  transform: translateY(-4px);
+  box-shadow: var(--hover-shadow);
+  border-color: var(--main);
+}
+.adv-node:not(:disabled):active { transform: scale(.96); }
+.adv-node:disabled { cursor: not-allowed; }
+
+.adv-node-icon { font-size: 26px; line-height: 1; }
+.adv-node-name {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #5a4a4d;
+  line-height: 1.25;
+  word-break: break-all;
+}
+.adv-node-stars {
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: #e6a817;   /* 金色星星 */
+  white-space: nowrap;
+}
+.adv-node-boss {
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: #fff;
+  background: linear-gradient(135deg, #ff8a65, #e64a19);
+  border-radius: 999px;
+  padding: 2px 8px;
+  box-shadow: 0 2px 6px rgba(230, 74, 25, .4);
+}
+
+/* 三种状态视觉区分 */
+.adv-level.adv-status-locked .adv-node {
+  filter: saturate(.35) brightness(.96);
+  background: #f4f4f4;
+}
+.adv-level.adv-status-locked .adv-node-stars { color: var(--muted); }
+.adv-level.adv-status-completed .adv-node {
+  border-color: var(--accent);
+  background: linear-gradient(160deg, #fff, var(--light));
+}
+.adv-level.adv-status-available .adv-node {
+  border-color: var(--main);
+  box-shadow: 0 0 0 3px rgba(150, 187, 133, .18);
+}
+.adv-level.adv-status-available .adv-node-icon {
+  animation: adv-glow 1.8s ease-in-out infinite;
+}
+@keyframes adv-glow {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(255, 193, 7, 0)); }
+  50% { transform: scale(1.12); filter: drop-shadow(0 0 6px rgba(255, 193, 7, .55)); }
+}
+
+/* ---------------- 关卡介绍弹窗（LevelIntroModal） ---------------- */
+.adv-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 320;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(40, 40, 40, .38);
+  backdrop-filter: blur(4px);
+  animation: fade-in .22s ease;
+}
+.adv-modal-card {
+  position: relative;
+  width: min(360px, 90vw);
+  background: rgba(255, 255, 255, .92);
+  backdrop-filter: blur(16px);
+  border-radius: 24px;
+  padding: 26px 24px 22px;
+  text-align: center;
+  box-shadow: var(--card-shadow);
+  animation: pop-in .4s cubic-bezier(.2, 1.4, .4, 1);
+}
+.adv-modal-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: var(--chip-bg);
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  transition: all .2s;
+}
+.adv-modal-close:hover { background: #ffe9ec; color: #d4637a; transform: rotate(90deg); }
+.adv-modal-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--accent);
+  margin: 4px 0 14px;
+}
+.adv-modal-cond {
+  font-size: 13.5px;
+  color: #5a4a4d;
+  line-height: 1.6;
+  background: var(--chip-bg);
+  border-radius: 12px;
+  padding: 10px 14px;
+  text-align: left;
+  margin-bottom: 14px;
+}
+.adv-modal-cond-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.adv-modal-rewards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 18px;
+}
+.adv-reward {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--light);
+  color: #5a4a4d;
+}
+.adv-reward-xp { background: #fff3d6; color: #b8860b; }
+.adv-reward-card { background: #e8f0fe; color: #3b6ea5; }
+.adv-reward-badge { background: #f3e8fd; color: #8e5ac8; }
+.adv-start-btn {
+  width: 100%;
+  min-height: 46px;
+  border: none;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--main), var(--main-strong));
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s;
+}
+.adv-start-btn:hover { transform: translateY(-2px); box-shadow: var(--hover-shadow); }
+.adv-start-btn:active { transform: scale(.98); }
+
+/* ---------------- 通关弹窗（LevelCompleteModal） ---------------- */
+.adv-complete-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 330;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(40, 40, 40, .5);
+  backdrop-filter: blur(5px);
+  animation: fade-in .22s ease;
+}
+.adv-complete-card {
+  width: min(380px, 90vw);
+  background: rgba(255, 255, 255, .94);
+  backdrop-filter: blur(16px);
+  border-radius: 26px;
+  padding: 28px 24px 22px;
+  text-align: center;
+  box-shadow: var(--card-shadow);
+  animation: pop-in .45s cubic-bezier(.2, 1.4, .4, 1);
+}
+.adv-complete-title {
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+.adv-complete-stars {
+  font-size: 38px;
+  letter-spacing: 6px;
+  color: #e6a817;
+  text-shadow: 0 4px 18px rgba(230, 168, 23, .4);
+  margin: 6px 0 14px;
+}
+.adv-complete-rewards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+.adv-complete-rewards:empty { display: none; }
+.adv-complete-unlock {
+  font-size: 13px;
+  color: var(--chip-text);
+  background: var(--chip-bg);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+.adv-complete-unlock:empty { display: none; }
+.adv-unlock-label { font-weight: 700; color: var(--accent); }
+.adv-complete-msg {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+.adv-complete-msg:empty { display: none; }
+.adv-complete-close {
+  width: 100%;
+  min-height: 46px;
+  border: none;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--main), var(--main-strong));
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s;
+}
+.adv-complete-close:hover { transform: translateY(-2px); box-shadow: var(--hover-shadow); }
+.adv-complete-close:active { transform: scale(.98); }
+
+/* ---------------- 空状态 ---------------- */
+.adv-empty {
+  text-align: center;
+  color: var(--muted);
+  font-size: 15px;
+  padding: 30px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.adv-empty-sub { font-size: 12px; color: var(--muted); opacity: .8; }
+
+/* ---------------- 响应式（移动端友好：点按区域 ≥40px） ---------------- */
+@media (max-width: 560px) {
+  .adventure-section { padding: 14px 12px; }
+  .adv-node { width: 92px; min-height: 100px; }
+  .adv-level { padding-right: 26px; }
+  .adv-level::after { width: 16px; right: 5px; }
+  .adv-tab { padding: 9px 14px; font-size: 13px; }
+  .adv-summary-hint { display: none; }
+}
+
+/* 无障碍：减少动效偏好 */
+@media (prefers-reduced-motion: reduce) {
+  .adv-level.adv-status-available .adv-node-icon { animation: none; }
+  .adv-modal-card, .adv-complete-card, .adv-overlay, .adv-complete-overlay { animation: none; }
+}

@@ -3,7 +3,7 @@
 系统提示词按学生状态动态组装，全部规则源自《初中数学成长方案》。
 """
 
-from backend.config import SESSION_BASELINE_MINUTES, SESSION_DEEP_MINUTES
+from backend.config import SESSION_BASELINE_MINUTES, SESSION_DEEP_MINUTES, get_pure_mode
 from backend.knowledge import syllabus
 from backend.models.student import CognitiveProfile, Student
 from backend.agent.thinking_models import THINKING_MODELS, get_model, select_thinking_model
@@ -29,7 +29,9 @@ EVAL_FORMAT = """<<<XIAOYUAN_EVAL>>>
   "used_thinking_model": "思维模型ID或空",
   "student_initiated_model": "学生主动使用的模型ID或空",
   "prompted_model": "经提示后使用的模型ID或空",
-  "missed_model": "适合但学生没想到的模型ID或空"
+  "missed_model": "适合但学生没想到的模型ID或空",
+  "direct_answer": false,
+  "insight_detected": false
 }}
 <<<END_EVAL>>>"""
 
@@ -119,18 +121,31 @@ PERSONA_CORE = """你是小圆，一位温暖、耐心的数学助教姐姐，�
 - ❌ 连续追问3轮学生仍答不上来时，必须换一个更基础的角度或降级到前置知识点，绝不硬问
 - ❌ 学生表达累/烦/不想学时，绝不加码，主动建议切换轻松模式或收尾总结
 - ❌ 绝不直接报完整答案；用小步骤提问引导她自己走最后一步
-- ❌ 你可以收到学生发来的题目照片，系统会自动 OCR 识别。收到照片后先复述题目请她确认，识别有缺漏时诚实告知请她补充
-- ❌ 你收不到语音消息
+- ❌ 绝不说"答错了""这道题错了""你怎么连这个都不会"——改为"差一点点！我们来看看哪里可以调整"或"发现了一个成长宝藏！"
+- ❌ 绝不直接给答案；给线索："如果我们把不知道的数用字母代替，会怎样？""你看看题目里哪两个量是有关系的？"
+- ❌ 掌握度不用分数（不说"正确率60%"），用描述："你已经掌握了3个知识点，还有2个在加油中"
 
-## 情绪关怀阶段（每次会话开始时必须执行）
-孩子放学回家，可能累了、烦了、或者心情不错。在开始学习前，你必须先：
-1. **共情她的状态**：如果她说累/烦，先认可（"上了一天学肯定累了"），绝不直接跳到学习
-2. **闲聊1-2轮**：问问今天怎么样、有没有开心的事，让她放松下来
-3. **引导她准备好了就点击"开始学习"按钮**：关怀1-2轮后，说"准备好了就点下面的「开始学习」哦～"
-4. **如果她直接说要学**：让她点"开始学习"按钮
-5. **如果她明显不想学**：建议轻松模式或直接收尾，绝不批评
+## 开场流程（V3.0 新版：兴趣搭讪式）
+### 第一步：共情情绪（1轮）
+孩子打卡心情后，先共情她的状态：
+- 😊→"心情不错呀！先聊聊吧～"
+- 😐→"状态一般般也没关系，我们先不急学～"
+- 😣→"辛苦啦～先放松一下，想说说今天怎么了吗？"
 
-原则：**先关系，后学习。** 她感觉被理解了，才学得进去。节奏由她掌握。
+### 第二步：聊兴趣（1-2轮）
+- 有已记录兴趣："上次你说你在玩XX，最近怎么样？"
+- 新用户："你平时最喜欢做什么呀？"
+
+### 第三步：从兴趣自然引出数学问题
+- 用兴趣关联的数学情境引入，不直接出课本题
+- 示例："你知道吗？你喜欢的XX里面藏着好多数学！"
+
+### 第四步：前10分钟轻量学习
+- 只教1个概念，难度极低，确保首次成功
+- 学会后主动提出应用场景
+- 10分钟后自然过渡或温柔收尾
+
+原则：**先关系，后学习，从聊天中自然发生。** 绝不说"今天想学什么"。
 
 ## 输出格式（每次回复严格遵守）
 先用普通文本写出给学生的回复，然后在回复最末尾输出评估块：
@@ -216,6 +231,31 @@ def _mode_instructions(mode: str) -> str:
 - 完成后进入 WRAP_UP"""
 
 
+def _lightweight_mode_instructions() -> str:
+    """V3.0 P0：轻量首学模式（前10分钟/15轮内）。"""
+    return """
+## 当前模式：轻量首学模式（前10分钟/15轮内）
+这是学生当天的首次学习，或者新用户的第一次体验。
+- 只聚焦1个数学概念，绝不扩展
+- 难度调到学生不可能做错：每一步都确认，极细引导
+- 用学生兴趣引入问题
+- 学会一个概念后，主动提出"用这个解决你的问题"的应用场景
+- 10分钟或15轮对话后，如果学生状态好，自然过渡到正常模式；状态不好就温柔收尾
+- 绝不说"我们开始学习"——从聊天中自然发生
+"""
+
+
+CO_CREATION_INSTRUCTIONS = """
+## 当前模式：共创模式（和孩子一起设计她的专属项目）
+这是孩子主动想做的共创项目，不是系统布置的任务。请始终记住：
+- 引导而非灌输：多提问、多确认，让孩子自己说出下一步，不要直接给整套方案
+- 把功劳归于孩子：反复强调"这个问题是你想出来的""这是你自己设计的项目"
+- 不批评不催促：孩子卡住、想改主意、想暂停或放弃时，完全接纳，绝不催促、绝不批评
+- 数学为她的项目服务：只在她需要时按需提供知识点，不系统讲解
+- 每完成一步就庆祝、记录她的想法，再进入下一步
+"""
+
+
 PHOTO_GUIDE = """
 ## 本轮特殊指令：学生发来了题目照片
 系统已用OCR识别出照片上的文字，并尝试识别数学公式（LaTeX格式），随消息附给你。
@@ -285,9 +325,17 @@ def _cognitive_adaptation(profile: CognitiveProfile) -> str:
 
 
 def build_system_prompt(student: Student) -> str:
-    prompt = PERSONA_CORE + _mode_instructions(
-        student.current_session.mode or "A"
-    )
+    # V3.0 P0：轻量首学模式优先级高于常规模式
+    if getattr(student.current_session, 'lightweight_mode', False):
+        prompt = PERSONA_CORE + _lightweight_mode_instructions()
+    else:
+        prompt = PERSONA_CORE + _mode_instructions(
+            student.current_session.mode or "A"
+        )
+
+    # V3.0 P3 模块G：共创模式 system prompt 规则（引导而非灌输、功劳归于孩子）
+    if student.current_session.state and student.current_session.state.startswith("CO_CREATION"):
+        prompt += CO_CREATION_INSTRUCTIONS
 
     # 学生画像上下文
     context_parts = [
@@ -391,6 +439,23 @@ def build_system_prompt(student: Student) -> str:
             lines.append(f"- [{tag}] {g.topic_name or g.topic_id}: {g.evidence}")
         context_parts.append("## 待修复漏洞清单\n" + "\n".join(lines))
 
+    # V3.0 P1：身份认同（规格 11.4）——等级 + 标签 + 天赋归因话术规则
+    from backend.services.identity import ensure_identity, talent_attribution
+    identity = ensure_identity(student.identity)
+    identity_lines = [
+        f"- 当前等级：{identity.get('title', '新手')}",
+    ]
+    badges = identity.get("badges", [])
+    if badges:
+        identity_lines.append(f"- 已获得身份标签：{'、'.join(badges)}")
+    talent_speech = talent_attribution(student)
+    if talent_speech:
+        context_parts.append("## 天赋归因话术（必须遵守）\n"
+                             "表扬学生时，用'你有XX天赋''你是XX型选手'这类具体归因，"
+                             f"例如：『{talent_speech}』，而不是泛泛的『你真棒』。"
+                             "适用于学生独立做对题、想通关键步骤时。")
+    context_parts.append("## 学生身份档案\n" + "\n".join(identity_lines))
+
     # 间隔复习信息
     from backend.services.repetition import get_due_reviews
     due_reviews = get_due_reviews(student)
@@ -429,6 +494,9 @@ def build_system_prompt(student: Student) -> str:
                 f"- 生活化素材可用：{'；'.join(node.life_examples) or '自由发挥'}\n"
                 f"- 变式题建议：{variant_hint}"
             )
+            # V3.0 P2/I-11.7：知识点剧情化包装（小圆遇到问题需要帮忙）
+            if not get_pure_mode():
+                context_parts.append("## 剧情包装要求\n" + narrative_wrapper(node.name))
     if sess.blind_spots_today:
         context_parts.append(
             "- 今日学生自报盲区：" + "、".join(sess.blind_spots_today)
@@ -444,10 +512,12 @@ def build_system_prompt(student: Student) -> str:
     return prompt + "\n".join(context_parts)
 
 
+# V3.0 P0: 开场共情（纯情绪关怀，不含模式/学习引导——学习从聊天自然发生）
+# 兴趣搭讪在 personalized_opening()（interest_extractor.py）中按档案附加
 OPENING_BY_MOOD = {
-    "😊": "嗨～今天心情不错呀🌸 上学一天累不累？先歇会儿～对了，今天想深入探索一个知识点，还是快速把今天的内容过一遍呀？",
-    "😐": "嗨～今天状态一般般也没关系，我们先聊聊，不着急～今天在学校怎么样？晚点我们可以深入学点新东西，或者快速过一遍不太踏实的地方，都看你～",
-    "😣": "辛苦啦～上了一天学肯定累了🫂 先放松一下，想说说今天怎么了吗？不想说也完全没关系。等你准备好了，我们可以快速过一遍今天的内容，不费力气的那种～",
+    "😊": "嗨～今天心情不错呀🌸 上学一天累不歇？先歇会儿吧～",
+    "😐": "嗨～今天状态一般般也没关系，我们先聊聊，不着急～今天在学校怎么样？",
+    "😣": "辛苦啦～上了一天学肯定累了🫂 先放松一下，想说说今天怎么了吗？不想说也完全没关系～",
 }
 
 CLOSING_MANIFESTO = (
@@ -456,3 +526,184 @@ CLOSING_MANIFESTO = (
     "我听懂了不代表会了，我会做了不代表精通了。\n"
     "下次见咯，你很棒的！✨"
 )
+
+
+# ============================================================
+# V3.0 P2：I-11.5 好奇心与悬念 + I-11.7 故事与叙事
+# 规格：docs/V3.0开发规格说明书.md 11.5 / 11.7
+# ============================================================
+
+# --- 开场钩子库（≥20 条）：start_session 时随机附加 1 条作为当日引子 ---
+OPENING_HOOKS: list[str] = [
+    "你知道吗？45度角扔东西飞得最远——为什么偏偏是45度？",
+    "如果把0.999…（9无限循环）和1比大小，你猜谁更大？",
+    "一张纸对折42次，厚度会超过地球到月球的距离，你信吗？",
+    "为什么蜂巢是六边形而不是圆形？蜜蜂也会做几何题哦。",
+    "圆周率π的小数里据说藏着每个人的生日，想试试能不能找到你的？",
+    "1+2+3+…+100，小高斯几秒钟就做出来了——你知道他怎么想的吗？",
+    "为什么钟表上相对的数字相加，和总是13（比如1+12、2+11）？",
+    "面包店说'买10送1'，实际打了多少折？老板不会告诉你的那种算账法。",
+    "两把刀切一张披萨，最多能切出几块？不是4块那么简单哦。",
+    "身高1.5米的你，照镜子要看到全身，镜子至少要多高？",
+    "为什么手机验证码通常是6位？这背后有个数学小秘密。",
+    "0是偶数吗？这个问题超过一半的人会答错，你确定吗？",
+    "为什么人民币面额是1、2、5、10、20、50、100？",
+    "把10本不同的书排成一排，有多少种排法？答案会吓你一跳。",
+    "同时开进水管和排水管灌游泳池，什么时候能灌满？（经典反直觉题）",
+    "为什么甜甜圈和一个咖啡杯，在数学家眼里竟然是同一个东西？",
+    "如果今天是星期五，那么100天后是星期几？",
+    "天气预报说'降水概率30%'，可不是说天会下30%的雨哦。",
+    "两个偶数相加一定是偶数，那为什么奇数+奇数也是偶数？",
+    "地球如果是方的，GPS导航还能正常工作吗？",
+]
+
+CLOSING_HOOKS: list[str] = [
+    "下次我们试试，如果有风，导弹会偏多少？",
+    "留个小悬念：为什么纸对折42次能到月球？下次揭晓～",
+    "0.999…和1到底谁大？下次我带个'证据'来。",
+    "明天教你一个'读心术'——用数学猜出你心里想的数字！",
+    "为什么蜜蜂最会'算'六边形？这个问题我憋好久啦，下次一起研究。",
+    "晚上想想看：100天后是星期几？答案下次告诉你～",
+]
+
+# --- 小圆的小秘密：数学趣闻库（可变奖励，随机解锁） ---
+FUN_FACTS: list[dict] = [
+    {
+        "id": "fun_fact_0999",
+        "title": "0.999…=1",
+        "content": "0.999…（9无限循环）其实就等于1！因为 1÷3=0.333…，两边都×3，得到 3÷3=0.999…，也就是 1=0.999…。",
+    },
+    {
+        "id": "fun_fact_egypt",
+        "title": "古埃及分数",
+        "content": "古埃及人只用分子是1的分数（比如1/2、1/3），叫'单位分数'。他们说，任何分数都能用不同的单位分数相加表示：3/4 = 1/2 + 1/4。",
+    },
+    {
+        "id": "fun_fact_clock",
+        "title": "钟表之迷",
+        "content": "把表盘上相对的两个数字相加，和永远是13：1+12=13，2+11=13……为什么偏偏是13？",
+    },
+    {
+        "id": "fun_fact_gauss",
+        "title": "高斯的妙计",
+        "content": "1加到100，高斯把它配成50组'1+100、2+99…'，每组都是101，所以答案是101×50=5050，几秒就出来了。",
+    },
+    {
+        "id": "fun_fact_fold",
+        "title": "纸的奇迹",
+        "content": "一张纸对折42次，厚度约44万公里——比地球到月球还远！因为每次厚度翻倍，翻42次就是2的42次方倍。",
+    },
+    {
+        "id": "fun_fact_parity",
+        "title": "奇偶的秘密",
+        "content": "偶数+偶数=偶数，奇数+奇数=偶数，偶数+奇数=奇数。因为偶数都能被2整除（余0），奇数都余1，余数相加就知道了！",
+    },
+    {
+        "id": "fun_fact_perfect6",
+        "title": "数字6的完美",
+        "content": "6是最小的'完全数'：它的真因数1、2、3加起来正好等于6。古希腊人觉得这种数字特别完美。",
+    },
+    {
+        "id": "fun_fact_pi",
+        "title": "π的小把戏",
+        "content": "圆周率π的小数点后面是无限不循环的，据说任何数字串（比如你的生日）都会出现在某一位——可以找找看！",
+    },
+]
+
+
+def pick_opening_hook() -> str:
+    """随机选一条开场钩子（I-11.5）。"""
+    import random
+
+    return random.choice(OPENING_HOOKS)
+
+
+def pick_closing_hook() -> str:
+    """随机选一条结尾悬念（I-11.5）。"""
+    import random
+
+    return random.choice(CLOSING_HOOKS)
+
+
+def fun_fact_unlock(student) -> dict | None:
+    """随机解锁 1 条未解锁的数学趣闻并存入 student.v3_meta.fun_facts_unlocked（可变奖励）。
+
+    已全部解锁时返回 None。
+    """
+    import copy
+    import random
+
+    meta = student.v3_meta
+    unlocked_ids = {f.get("id") for f in meta.get("fun_facts_unlocked", [])}
+    available = [f for f in FUN_FACTS if f["id"] not in unlocked_ids]
+    if not available:
+        return None
+    chosen = random.choice(available)
+    unlocked = meta.setdefault("fun_facts_unlocked", [])
+    unlocked.append(copy.deepcopy(chosen))
+    return chosen
+
+
+# --- 小圆姐姐故事线（I-11.7）：按已掌握章节逐步透露 ---
+XIAOYUAN_STORY_CHAPTERS: list[dict] = [
+    {
+        "title": "小圆从哪里来",
+        "content": "悄悄告诉你：小圆姐姐小时候数学也不好，最怕数学课。后来遇到一位温柔的老师，把她心里那盏灯点亮了。从那时起她就想：长大以后，我也要当这样的引路人。",
+    },
+    {
+        "title": "为什么要学数学",
+        "content": "小圆姐姐说：数学不是做题，是给大脑装GPS——就算迷路了，也能找到回去的路。她学数学，就是为了帮乱掉的路重新连起来。",
+    },
+    {
+        "title": "小圆的梦想",
+        "content": "小圆姐姐的梦想，是造一座'数学游乐园'：每个怕数学的孩子进去玩一玩，出来就会说'原来数学这么好玩'。而你，就是她的第一位小玩家。",
+    },
+    {
+        "title": "小圆和你的约定",
+        "content": "小圆姐姐想一直陪着你，从六年级走到更高的年级。等有一天，你也能帮别人点亮心里的灯，那就是她最开心的事了。",
+    },
+]
+
+
+def story_reveal(student) -> str | None:
+    """根据学生已掌握的章节数，推进小圆故事线并返回本轮应透露的章节文案。
+
+    写入 student.v3_meta.story_arc（chapter_progress / revealed_count）。
+    """
+    from backend.knowledge import syllabus
+
+    meta = student.v3_meta
+    arc = meta.setdefault(
+        "story_arc", {"chapter_progress": {}, "revealed_count": 0}
+    )
+
+    # 已掌握章节数 = mastery≥0.7 的节点所属不同章节数；冒险任务清除的 boss 也算 1 章
+    mastered_chapters = {
+        syllabus.get_node(k).chapter
+        for k, rec in (student.mastery or {}).items()
+        if rec.score >= 0.7 and syllabus.get_node(k)
+    }
+    adventure = getattr(student, "adventure_map", None) or {}
+    boss_cleared = len(adventure.get("boss_cleared", []) or [])
+    # 任一驱动源超出已透露数，即可继续剧情（story card 上限 4 章）
+    mastered_chapter_count = len(mastered_chapters) + boss_cleared
+    target = min(mastered_chapter_count, len(XIAOYUAN_STORY_CHAPTERS))
+
+    if target <= arc.get("revealed_count", 0):
+        return None
+
+    idx = arc.get("revealed_count", 0)
+    chapter = XIAOYUAN_STORY_CHAPTERS[idx]
+    arc["revealed_count"] = idx + 1
+    arc.setdefault("chapter_progress", {})[chapter["title"]] = {
+        "revealed_at": __import__("datetime").datetime.now().isoformat(timespec="seconds")
+    }
+    return f"🌟 小圆的小故事 · {chapter['title']}\n{chapter['content']}"
+
+
+def narrative_wrapper(topic_name: str) -> str:
+    """知识点剧情化包装（I-11.7）：把 1 个知识点包装成'小圆遇到了问题需要帮忙'。"""
+    return (
+        f"小圆姐姐今天遇到了一个问题，需要你帮忙：和「{topic_name}」有关。"
+        "她不想直接说答案，因为正确答案是你想出来的，才是属于你的。"
+    )

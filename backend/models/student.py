@@ -48,6 +48,9 @@ class SessionState(BaseModel):
     current_thinking_model: str = ""    # 当前使用的思维模型
     state_entry_time: str = ""          # 进入当前状态的时间
     consecutive_negative_turns: int = 0  # 连续负面情绪轮数
+    # V3.0 P0：轻量首学模式
+    lightweight_mode: bool = False
+    insight_today: int = 0              # 今日顿悟次数
 
 
 class SessionSummary(BaseModel):
@@ -184,9 +187,35 @@ class Student(BaseModel):
     cognitive_assessment_answers: list[dict[str, Any]] = Field(default_factory=list)  # 认知评估答题记录
     thinking_model_mastery: dict[str, float] = Field(default_factory=dict)  # 思维模型掌握度 {模型ID: 0.0~1.0}
     crisis_events: list[dict[str, Any]] = Field(default_factory=list)  # 心理危机事件记录
+    insights: dict = Field(default_factory=lambda: {                  # V3.0 P0：顿悟时刻数据
+        "total_count": 0,
+        "history": [],
+        "challenge_completed": 0,
+        "thinking_problems_solved": 0,
+        "current_thinking_problem": None,
+    })
     interests: list[str] = Field(default_factory=list)          # 兴趣爱好列表，如 ["烘焙", "游戏"]
     preferences: dict[str, str] = Field(default_factory=dict)   # 偏好设置，如 {"favorite_metaphor": "烘焙"}
     parent_notifications: list[dict[str, Any]] = Field(default_factory=list)  # 家长通知（F1）
+
+    # ---- V3.0 P1：游戏化三件套 + 身份认同 ----
+    pet: dict = Field(default_factory=dict)          # 宠物：species/name/level/exp/mood/skins 等
+    cards: dict = Field(default_factory=dict)        # 卡片：collected/starlight/total_cards/unique_cards
+    combo: dict = Field(default_factory=dict)        # 连击：current/best_all_time/best_this_week 等
+    identity: dict = Field(default_factory=dict)     # 身份：level/title/badges/unlocked_titles 等
+    creations: list[dict[str, Any]] = Field(default_factory=list)  # 作品墙：孩子出的题/讲解/画
+
+    # ---- V3.0 P2：闯关冒险地图 + PBL 项目体系 ----
+    adventure_map: dict = Field(default_factory=dict)  # 冒险地图：current_continent/unlocked_levels/completed_levels/stars/total_stars/boss_cleared
+    pbl_projects: dict = Field(default_factory=dict)   # PBL：{active_project_id, projects: {pid: 进度}} 见规格 7.2.1
+    custom_projects: list[dict[str, Any]] = Field(default_factory=list)  # P3 共创项目（P2 预留）
+
+    # ---- V3.0 P2：故事与叙事（I-11.7）----
+    v3_meta: dict = Field(default_factory=lambda: {   # V3 元数据：剧情进度/小圆秘密解锁等
+        "story_arc": {"chapter_progress": {}, "revealed_count": 0},
+        "fun_facts_unlocked": [],
+        "pbl_prompts": {},
+    })
 
     current_session: SessionState = Field(default_factory=SessionState)
 

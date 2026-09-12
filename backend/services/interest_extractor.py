@@ -151,11 +151,12 @@ def extract_interests(message: str, existing: list[str]) -> list[str]:
 
 
 def personalized_opening(mood: str, student) -> str:
-    """根据学生兴趣生成个性化开场白。"""
+    """根据学生兴趣生成个性化开场白（V3.0 兴趣搭讪式，绝不引导模式/学习）。"""
     from backend.agent.persona import OPENING_BY_MOOD
     base = OPENING_BY_MOOD.get(mood, OPENING_BY_MOOD["😐"])
     if not student.interests:
-        return base
+        # V3.0 10.3.2：无兴趣档案（新用户）→ 先聊兴趣，不直接学数学
+        return f"{base}\n先不急着学数学，我们来聊聊天。你平时最喜欢做什么呀？"
 
     interest = student.interests[0]
     interest_lines = {
@@ -172,6 +173,37 @@ def personalized_opening(mood: str, student) -> str:
     }
     line = interest_lines.get(interest)
     if line:
-        # 在第一个"～"后插入兴趣引用
-        base = base.replace("～", f"～{line}", 1)
+        # 共情句 + 换行 + 兴趣搭讪句（规格 10.3.2 两句式，不上插到句子中间）
+        return f"{base}\n{line}"
     return base
+
+
+# V3.0 P0: 开场兴趣关联数学问题
+OPENING_PROBLEMS: dict[str, list[str]] = {
+    "烘焙": [
+        "食谱说用1/3杯糖，但你只有1/6杯的量杯，要量几次？",
+        "6寸蛋糕改8寸，鸡蛋3个要变几个？",
+    ],
+    "游戏": [
+        "抽卡概率5%，抽20次至少中1次的概率你觉得大概多少？",
+        "攻击力100提升20%再降20%，最后攻击力是多少？",
+    ],
+    "音乐": ["一首3/4拍曲子有16小节，一共多少拍？"],
+    "运动": ["跑100米用了15秒，你的速度是多少？"],
+    "画画": ["画人像头身比1:7，头3cm，身体画多长？"],
+    "阅读": ["一本书300页每天读25页，几天读完？"],
+    "动漫": ["动漫角色身高是头长7倍，头20cm，身高多少？"],
+    "宠物": ["猫每天吃3次每次50g，2kg猫粮能吃几天？"],
+    "旅行": ["高铁300km/h，上海到北京1318km，几小时？"],
+    "电影": ["电影120分钟看了45分钟，还剩百分之几？"],
+}
+
+
+def get_opening_problem(interest: str) -> str | None:
+    """根据学生兴趣获取开场数学问题。"""
+    problems = OPENING_PROBLEMS.get(interest)
+    if not problems:
+        all_problems = [p for ps in OPENING_PROBLEMS.values() for p in ps]
+        return all_problems[0] if all_problems else None
+    import random
+    return random.choice(problems)

@@ -1,0 +1,458 @@
+/* ============================================================
+   V3.0 P3 · 模块 G「兴趣共创机制」样式 (co-creation.css)
+   规格 9.5（docs/V3.0开发规格说明书.md 1278-1290 行）
+   颜色遵循 style.css 主题变量（--main/--light/--accent/--muted/--chip-bg 等）
+   与 pbl.css 风格保持一致
+   ============================================================ */
+
+/* ---------------- 挂载容器 ---------------- */
+.co-creation-section { margin-top: 24px; }
+.co-wrap { position: relative; }
+.co-loading { color: var(--muted); font-size: 14px; text-align: center; padding: 28px 16px; }
+
+/* ---------------- 区块头部 ---------------- */
+.co-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.co-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--accent);
+}
+.co-new-btn {
+  border: none;
+  background: linear-gradient(135deg, var(--main), var(--main-strong));
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 12px;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s;
+}
+.co-new-btn:hover { transform: translateY(-2px); box-shadow: var(--hover-shadow); }
+
+.co-mock-tip {
+  font-size: 11px;
+  color: #c9a227;
+  background: #fff8e1;
+  border-radius: 8px;
+  padding: 4px 10px;
+  margin-top: 8px;
+  display: inline-block;
+}
+
+/* ---------------- 项目卡片（CustomProjectCard） ---------------- */
+.co-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 14px;
+  margin-top: 12px;
+}
+.co-card {
+  position: relative;
+  background: #fff;
+  border-radius: 18px;
+  padding: 18px 16px 14px;
+  cursor: pointer;
+  box-shadow: var(--soft-shadow);
+  border: 2px solid transparent;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: hidden;
+}
+.co-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--hover-shadow);
+  border-color: var(--accent);
+}
+.co-card:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.co-my-tag {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(135deg, #6fa8dc, #4a86c8);
+  border-radius: 999px;
+  padding: 2px 9px;
+  box-shadow: 0 2px 8px rgba(74, 134, 200, .35);
+}
+.co-card-icon { font-size: 34px; line-height: 1; margin: 14px 0 2px; }
+.co-card-name { font-size: 16px; font-weight: 800; color: #5a4a4d; line-height: 1.3; }
+.co-card-interest { font-size: 12px; color: var(--muted); }
+
+/* 状态角标 */
+.co-status-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 2px 9px;
+  color: #fff;
+  display: inline-block;
+}
+.co-status-badge.planning { background: #8e9aaf; }
+.co-status-badge.in-progress { background: #ff9f43; }
+.co-status-badge.completed { background: var(--accent); }
+.co-status-badge.abandoned { background: #b8b8b8; }
+
+/* 进度条 */
+.co-progress {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--chip-bg);
+  overflow: hidden;
+  margin-top: 4px;
+}
+.co-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--main), var(--main-strong));
+  transition: width .4s ease;
+}
+.co-progress-text {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* ---------------- 空态 ---------------- */
+.co-empty {
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+  padding: 36px 16px;
+  line-height: 1.6;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: var(--soft-shadow);
+  margin-top: 12px;
+}
+
+/* ---------------- 详情（CustomProjectDetail） ---------------- */
+.co-back {
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px 0;
+  margin-bottom: 10px;
+}
+.co-back:hover { opacity: .75; }
+
+.co-detail-hero {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  background: #fff;
+  border-radius: 20px;
+  padding: 18px 20px;
+  box-shadow: var(--soft-shadow);
+}
+.co-hero-icon {
+  font-size: 44px;
+  line-height: 1;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
+  background: var(--light);
+}
+.co-hero-info { flex: 1; min-width: 0; }
+.co-hero-name { font-size: 19px; font-weight: 800; color: #5a4a4d; margin: 0 0 8px; }
+.co-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+.co-hero-meta .co-status-badge { position: static; }
+
+.co-notes {
+  font-size: 12px;
+  color: #7d6a4e;
+  background: #fff8e1;
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-top: 12px;
+  line-height: 1.5;
+}
+
+.co-sub-title { margin: 18px 0 10px; font-size: 15px; color: var(--accent); }
+
+/* ---------------- 步骤列表 ---------------- */
+.co-steps { display: flex; flex-direction: column; gap: 10px; }
+
+.co-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  border-radius: 16px;
+  padding: 14px 16px;
+  box-shadow: var(--soft-shadow);
+  border-left: 4px solid transparent;
+  transition: box-shadow .18s ease, border-color .18s ease;
+}
+.co-step.pending { border-left-color: #d8d8d8; }
+.co-step.in-progress { border-left-color: #ff9f43; }
+.co-step.done { border-left-color: var(--accent); }
+.co-step.active {
+  box-shadow: 0 0 0 2px #ff9f43, var(--hover-shadow);
+}
+
+.co-step-num {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--accent);
+  background: var(--light);
+  border-radius: 10px;
+  padding: 6px 10px;
+  flex-shrink: 0;
+}
+.co-step-info { flex: 1; min-width: 0; }
+.co-step-name { font-size: 15px; font-weight: 700; color: #5a4a4d; }
+.co-step-desc { font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+.co-step-k {
+  font-size: 11px;
+  color: var(--accent);
+  background: var(--light);
+  border-radius: 8px;
+  padding: 2px 8px;
+  margin-top: 5px;
+  display: inline-block;
+}
+.co-step-state {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.co-step.done .co-step-state { color: var(--accent); }
+.co-step.in-progress .co-step-state { color: #ff9f43; }
+
+.co-step-done-btn {
+  border: none;
+  background: linear-gradient(135deg, var(--main), var(--main-strong));
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 12px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s;
+  flex-shrink: 0;
+}
+.co-step-done-btn:hover { transform: translateY(-2px); box-shadow: var(--hover-shadow); }
+
+/* ---------------- 详情操作 ---------------- */
+.co-detail-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+.co-abandon-btn {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 12px;
+}
+.co-abandon-btn:hover { color: #d4637a; background: #fdeef1; }
+.co-complete-btn {
+  border: none;
+  background: linear-gradient(135deg, #ffb84d, #ff9f43);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  border-radius: 14px;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s;
+  box-shadow: 0 4px 14px rgba(255, 159, 67, .35);
+}
+.co-complete-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(255, 159, 67, .45); }
+
+/* ---------------- 项目规划弹窗（ProjectPlanModal） ---------------- */
+.co-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 170;
+  background: rgba(0, 0, 0, .55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: co-fade-in .2s ease;
+}
+.co-modal-card {
+  width: min(440px, 94vw);
+  max-height: 88vh;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 24px;
+  padding: 24px 22px 22px;
+  box-shadow: var(--card-shadow);
+  position: relative;
+  animation: co-pop-in .35s cubic-bezier(.2, 1.4, .4, 1);
+}
+.co-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  border: none;
+  background: transparent;
+  font-size: 22px;
+  color: var(--muted);
+  cursor: pointer;
+  line-height: 1;
+}
+.co-modal-close:hover { color: #5a4a4d; }
+.co-modal-title { font-size: 18px; font-weight: 800; color: #5a4a4d; margin-bottom: 4px; }
+.co-modal-hint { font-size: 12px; color: var(--muted); margin-bottom: 16px; line-height: 1.5; }
+
+.co-field { display: block; margin-bottom: 14px; }
+.co-field-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: #5a4a4d;
+  margin-bottom: 6px;
+}
+.co-field input,
+.co-field textarea {
+  width: 100%;
+  border: 2px solid var(--light);
+  border-radius: 12px;
+  padding: 9px 12px;
+  font-size: 13px;
+  outline: none;
+  transition: border-color .2s;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+.co-field input:focus,
+.co-field textarea:focus { border-color: var(--main); }
+
+.co-plan-steps { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+.co-plan-step {
+  background: var(--light);
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+.co-plan-step-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.co-plan-step-no { font-size: 12px; font-weight: 800; color: var(--accent); }
+.co-plan-step-del {
+  border: none;
+  background: transparent;
+  color: #d4637a;
+  font-size: 16px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 2px;
+}
+.co-plan-step-name,
+.co-plan-step-desc {
+  width: 100%;
+  border: 2px solid #fff;
+  border-radius: 10px;
+  padding: 7px 10px;
+  font-size: 13px;
+  outline: none;
+  transition: border-color .2s;
+  box-sizing: border-box;
+  margin-bottom: 6px;
+  font-family: inherit;
+}
+.co-plan-step-desc { margin-bottom: 0; }
+.co-plan-step-name:focus,
+.co-plan-step-desc:focus { border-color: var(--main); }
+
+.co-add-step-btn {
+  border: 2px dashed var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 12px;
+  padding: 8px;
+  cursor: pointer;
+  width: 100%;
+  transition: background .15s;
+}
+.co-add-step-btn:hover { background: var(--light); }
+
+.co-modal-btns { display: flex; gap: 10px; margin-top: 16px; }
+.co-ghost-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 12px;
+  border-radius: 14px;
+}
+.co-ghost-btn:hover { color: var(--accent); }
+.co-submit-btn {
+  flex: 2;
+  border: none;
+  background: linear-gradient(135deg, var(--main), var(--main-strong));
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  border-radius: 14px;
+  padding: 12px;
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s;
+}
+.co-submit-btn:hover { transform: translateY(-2px); box-shadow: var(--hover-shadow); }
+.co-submit-btn:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+
+/* ---------------- 动画 ---------------- */
+@keyframes co-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes co-pop-in {
+  from { transform: scale(.85) translateY(20px); opacity: 0; }
+  to { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+/* ---------------- 响应式 ---------------- */
+@media (max-width: 720px) {
+  .co-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .co-detail-hero { flex-direction: column; text-align: center; }
+  .co-hero-meta { justify-content: center; }
+  .co-step { flex-wrap: wrap; }
+  .co-step-state { order: 3; width: 100%; text-align: right; }
+}
+@media (max-width: 420px) {
+  .co-grid { grid-template-columns: 1fr; }
+}

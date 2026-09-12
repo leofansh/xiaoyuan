@@ -19,6 +19,7 @@
     "nav.knowledge": "🧠 知识脑图",
     "nav.badges": "🏅 成长墙",
     "nav.cognitive": "🔬 认知画像",
+    "nav.pbl": "🚀 项目挑战",
     
     "streak.title": "连续学习天数（保底日也算）",
     "streak.days": "天",
@@ -67,7 +68,30 @@
     
     "settings.lang": "🌐 语言",
     "settings.langZh": "中文",
-    "settings.langEn": "English"
+    "settings.langEn": "English",
+
+    "settings.llmTitle": "🤖 LLM 模型",
+    "settings.llmProvider": "提供商",
+    "settings.llmModel": "模型",
+    "settings.llmApiKey": "API Key",
+    "settings.test": "测试连接",
+    "settings.free": "免费",
+    "settings.freeNote": "免费层速率限制说明",
+    "settings.customBaseUrl": "自定义 Base URL",
+    "settings.customModel": "模型名",
+    "settings.pureMode": "🧘 纯学习模式",
+    "settings.pureModeHint": "关闭趣味动画与游戏化提示，只保留最纯粹的学习对话",
+
+    "insight.title": "✨ 顿悟时刻",
+    "insight.quote": "你自己想通了！",
+    "challenge.title": "🎯 挑战题",
+    "challenge.invite": "这道题有点难，你敢挑战吗？",
+    "challenge.success": "太厉害了！挑战成功！",
+    "thinking_daily.title": "🌙 今日思考题",
+    "thinking_daily.solved": "想通了！",
+    "mastery.on_track": "还在加油中",
+    "mastery.mastered": "已经掌握了",
+    "mastery.new_gain": "又进步了一点！"
   },
   
   "en": {
@@ -90,6 +114,7 @@
     "nav.knowledge": "🧠 Knowledge Map",
     "nav.badges": "🏅 Growth Wall",
     "nav.cognitive": "🔬 Cognitive Profile",
+    "nav.pbl": "🚀 PBL Projects",
     
     "streak.title": "Consecutive learning days (baseline days count)",
     "streak.days": "days",
@@ -138,6 +163,29 @@
     
     "settings.lang": "🌐 Language",
     "settings.langZh": "中文",
-    "settings.langEn": "English"
+    "settings.langEn": "English",
+
+    "settings.llmTitle": "🤖 LLM Model",
+    "settings.llmProvider": "Provider",
+    "settings.llmModel": "Model",
+    "settings.llmApiKey": "API Key",
+    "settings.test": "Test Connection",
+    "settings.free": "Free",
+    "settings.freeNote": "Free tier rate limit info",
+    "settings.customBaseUrl": "Custom Base URL",
+    "settings.customModel": "Model Name",
+    "settings.pureMode": "🧘 Pure Study Mode",
+    "settings.pureModeHint": "Disable fun animations & gamified hints, keep only pure learning dialogue",
+
+    "insight.title": "✨ Insight Moment",
+    "insight.quote": "You figured it out yourself!",
+    "challenge.title": "🎯 Challenge Problem",
+    "challenge.invite": "This one's tricky. Dare to try?",
+    "challenge.success": "Amazing! Challenge complete!",
+    "thinking_daily.title": "🌙 Today's Thinking Problem",
+    "thinking_daily.solved": "I got it!",
+    "mastery.on_track": "Still getting there",
+    "mastery.mastered": "Already mastered",
+    "mastery.new_gain": "Getting better!"
   }
 }
