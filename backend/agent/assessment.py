@@ -65,10 +65,13 @@ def apply_eval(student: Student, eval_data: dict, *, suppress_combo: bool = Fals
 
         old_rec = student.mastery.get(topic_id)
         old_score = old_rec.score if old_rec else 0.0
+        # K.2：被提示（hinted）作答时降权，避免「靠提示过关」被计入真实掌握度
+        weight = 0.3 if eval_data.get("hinted") is True else 1.0
         new_rec = update_mastery(
             old_rec,
             observed_correct=independent_success,
             llm_score=float(score),
+            weight=weight,
         )
         student.mastery[topic_id] = new_rec
         if old_score < 0.7 <= new_rec.score:

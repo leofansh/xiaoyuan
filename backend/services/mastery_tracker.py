@@ -23,11 +23,13 @@ def update_mastery(
     observed_correct: bool | None,
     llm_score: float | None,
     today: str | None = None,
+    weight: float = 1.0,
 ) -> MasteryRecord:
     """用一次观测更新掌握度记录。返回（可能新建的）记录。
 
     - observed_correct: 学生是否答对（True/False）。None 表示无法判定（仅 LLM 评估）。
     - llm_score: LLM 粗估掌握度 0~1（无需独立作答信号时当作弱观测）。
+    - weight: 观测权重系数（默认 1.0；被提示/卸载场景降权，如 0.3），向后兼容。
     """
     if record is None:
         record = MasteryRecord()
@@ -54,7 +56,7 @@ def update_mastery(
         prior = record.score
         observed_est = empirical if empirical is not None else llm_score
         if observed_est is not None:
-            w = 0.4 * signal_strength
+            w = 0.4 * signal_strength * weight
             record.score = max(0.0, min(1.0, prior * (1 - w) + observed_est * w))
 
     # 置信度：随观测数增长，且独立作答样本权重更高

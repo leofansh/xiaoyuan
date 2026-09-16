@@ -184,6 +184,13 @@ def get_weekly_report(student_id: str):
     return generate_weekly_report(s)
 
 
+@app.get("/api/student/{student_id}/offload-events")
+def get_offload_events(student_id: str):
+    """K.5：获取认知卸载事件列表（周报/家长端用）。"""
+    s = _load_student(student_id)
+    return {"student_id": student_id, "events": list(s.offload_events)}
+
+
 @app.get("/api/student/{student_id}/notifications")
 def get_notifications(student_id: str):
     """获取家长通知列表（F1）。"""
