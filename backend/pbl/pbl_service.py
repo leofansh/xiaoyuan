@@ -42,6 +42,7 @@ def _new_project_record(project_id: str) -> dict:
         "unlocked_levels": [1],
         "completed_levels": [],
         "level_states": {},
+        "choices_answered": {},
         "total_time_spent": 0,
         "started_at": datetime.now().isoformat(timespec="seconds"),
         "completed_at": None,
@@ -145,7 +146,80 @@ def get_project_detail(student, project_id: str) -> dict:
         out["best_score"] = state.get("best_score")
         annotated.append(out)
     detail["levels"] = annotated
+    detail["pending_choice"] = get_pending_choice(student, project_id)
     return detail
+
+
+# ---------------------------------------------------------------------------
+# 剧情选择（规格 11.7）
+# ---------------------------------------------------------------------------
+
+
+def get_pending_choice(student, project_id: str) -> dict | None:
+    """返回第一个「前置关卡已通关但尚未作答」的剧情选择点，无则返回 None。
+
+    不阻塞关卡进入（非强制彩蛋）：仅当 at_level 关卡已 completed 且该选择点
+    未出现在 record.choices_answered 中时才会被返回。
+    """
+    project = get_project(project_id)
+    if project is None:
+        return None
+    pbl = ensure_pbl(getattr(student, "pbl_projects", None))
+    student.pbl_projects = pbl
+    record = pbl.get("projects", {}).get(project_id)
+    if record is None:
+        return None
+
+    states = record.get("level_states", {})
+    answered = record.get("choices_answered", {}) or {}
+    for choice in project.get("choices", []):
+        at_level = choice.get("at_level")
+        if not states.get(str(at_level), {}).get("completed"):
+            continue
+        if choice.get("id") in answered:
+            continue
+        return {
+            "choice_id": choice.get("id"),
+            "at_level": at_level,
+            "prompt": choice.get("prompt"),
+            "options": choice.get("options", []),
+        }
+    return None
+
+
+def _choice_next_intro(option: dict) -> str:
+    """根据选项 focus 生成选择后的引导话术。"""
+    label = option.get("label", "")
+    focus = option.get("focus", "")
+    if focus == "wind":
+        return f"好，你选了「{label}」。那我们继续前进！记住：顶风时导弹会被吹偏、射程变短，需要加大力度并压低角度。"
+    if focus == "distance":
+        return f"好，你选了「{label}」。那我们继续前进！记住：距离越远，角度的小误差被放大得越明显，瞄准时要更耐心地微调。"
+    return f"好，你选了「{label}」。让我们继续前进吧！"
+
+
+def answer_choice(student, project_id: str, choice_id: str, option_id: str) -> dict:
+    """记录剧情选择并返回引导话术（规格 11.7）。"""
+    project = get_project(project_id)
+    if project is None:
+        return {"success": False, "message": "项目不存在"}
+    choice = next((c for c in project.get("choices", []) if c.get("id") == choice_id), None)
+    if choice is None:
+        return {"success": False, "message": "选择点不存在"}
+    option = next((o for o in choice.get("options", []) if o.get("id") == option_id), None)
+    if option is None:
+        return {"success": False, "message": "选项不存在"}
+
+    pbl = ensure_pbl(getattr(student, "pbl_projects", None))
+    student.pbl_projects = pbl
+    record = pbl.setdefault("projects", {}).setdefault(project_id, _new_project_record(project_id))
+    record.setdefault("choices_answered", {})[choice_id] = option_id
+
+    return {
+        "success": True,
+        "chosen": option,
+        "next_intro": _choice_next_intro(option),
+    }
 
 
 # ---------------------------------------------------------------------------

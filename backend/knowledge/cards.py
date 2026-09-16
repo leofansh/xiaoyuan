@@ -193,12 +193,13 @@ def ensure_cards(raw: dict | None) -> dict:
 
 
 def drop_card(cards: dict, *, source: str = "mastery",
-              knowledge_node: str = "", guaranteed: bool = False) -> dict:
+              knowledge_node: str = "", guaranteed: bool = False,
+              force_rarity: str = "") -> dict:
     """卡片掉落（规格 4.3.3）。
 
     规则：
     1. guaranteed=True 且指定 knowledge_node → 必掉该节点卡
-    2. 否则按稀有度概率随机（优先未充分收集的卡）
+    2. 否则按稀有度概率随机（优先未充分收集的卡）；force_rarity 非空时忽略概率、强制该稀有度
     3. 重复卡 → 转化星光值，count+1
     4. 新卡 → unique_cards+1
     """
@@ -211,7 +212,8 @@ def drop_card(cards: dict, *, source: str = "mastery",
     if card is None:
         # 优先掉未拥有的或数量最少的卡（同样稀有度内）
         owned_ids = set(collected.keys())
-        card = _pick_random_card(target_rarity=random_rarity(), exclude=owned_ids)
+        rarity = force_rarity or random_rarity()
+        card = _pick_random_card(target_rarity=rarity, exclude=owned_ids)
         if card and card["id"] in collected and random.random() < 0.3:
             # 仍可能掉已有卡（30%），保证重复卡有产出
             pass
@@ -253,13 +255,23 @@ def drop_card(cards: dict, *, source: str = "mastery",
     }
 
 
-def exchange_skin(cards: dict, skin_id: str, cost: int) -> dict:
-    """星光值兑换皮肤（规格 4.3.4）。"""
+# 皮肤价目表（规格 4.3.4/4.7）：skin_id -> 星光值价格，与服务端皮肤 id 一致
+SKIN_PRICES: dict[str, int] = {"sakura": 100, "starry": 200, "golden": 300, "cosmic": 500}
+
+
+def exchange_skin(cards: dict, skin_id: str, cost: int | None = None) -> dict:
+    """星光值兑换皮肤（规格 4.3.4）。
+
+    仅信任服务端价目表 SKIN_PRICES，忽略客户端传入的 cost。
+    """
     cards = ensure_cards(cards)
-    if cards["starlight"] < cost:
+    if skin_id not in SKIN_PRICES:
+        raise ValueError("未知皮肤")
+    price = SKIN_PRICES[skin_id]
+    if cards["starlight"] < price:
         raise ValueError("星光值不足")
-    cards["starlight"] -= cost
-    return {"success": True, "starlight_remaining": cards["starlight"], "unlocked_skin": skin_id}
+    cards["starlight"] -= price
+    return {"success": True, "starlight_remaining": cards["starlight"], "unlocked_skin": skin_id, "cost": price}
 
 
 def completion_rate(cards: dict) -> float:

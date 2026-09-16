@@ -63,28 +63,104 @@ def compute_level(student) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# 身份标签触发规则
+# 身份标签触发规则（规格 11.4 / L1500）
 # ---------------------------------------------------------------------------
+def _pbl_projects(student) -> dict:
+    """取 student.pbl_projects.projects，容错缺失。"""
+    pbl = getattr(student, "pbl_projects", None)
+    if isinstance(pbl, dict):
+        return pbl.get("projects", {}) or {}
+    return {}
+
+
+def _pbl_project(student, project_id) -> dict | None:
+    """取某个 PBL 项目进度记录，无则 None。"""
+    record = _pbl_projects(student).get(project_id)
+    return record if isinstance(record, dict) else None
+
+
+def _project_completed(record: dict) -> bool:
+    """PBL 项目是否通关：status=completed 或全部 level_states 完成。"""
+    if record.get("status") == "completed":
+        return True
+    states = record.get("level_states", {}) or {}
+    if states and isinstance(states, dict):
+        return all(
+            isinstance(v, dict) and v.get("completed") for v in states.values()
+        )
+    return False
+
+
+def _pbl_completed_level_count(student) -> int:
+    """PBL 各项目已完成关卡总数。"""
+    total = 0
+    for record in _pbl_projects(student).values():
+        if isinstance(record, dict):
+            total += len(record.get("completed_levels", []) or [])
+    return total
+
+
+def _adventure_boss_cleared(student) -> int:
+    adv = getattr(student, "adventure_map", None)
+    if isinstance(adv, dict):
+        return len(adv.get("boss_cleared", []) or [])
+    return 0
+
+
+def _adventure_completed_levels(student) -> int:
+    adv = getattr(student, "adventure_map", None)
+    if isinstance(adv, dict):
+        return len(adv.get("completed_levels", []) or [])
+    return 0
+
+
+def _missile_completed(student) -> bool:
+    """神射手：导弹发射弧线项目通关（缺项目记录时退化为 Boss 关通关）。"""
+    missile = _pbl_project(student, "missile_trajectory")
+    if missile is not None:
+        return _project_completed(missile)
+    return _adventure_boss_cleared(student) >= 1
+
+
+def _builder_completed(student) -> bool:
+    """建筑大师：建筑项目通关（暂无建筑项目，等价 PBL 完成关卡>=6 或冒险>=6关）。"""
+    return _pbl_completed_level_count(student) >= 6 or _adventure_completed_levels(student) >= 6
+
+
+def _modeling_detective(student) -> bool:
+    """建模侦探：用方程解决 3 个真实问题（缺字段退化为 PBL 完成关卡>=3）。"""
+    interest = getattr(student, "interest_driven", None)
+    if isinstance(interest, dict) and "real_world_problems_solved" in interest:
+        return (interest.get("real_world_problems_solved") or 0) >= 3
+    return _pbl_completed_level_count(student) >= 3
+
+
+def _problem_master(student) -> bool:
+    """出题大师：出过 10 道题（creations 中 type=="problem" 数量>=10）。"""
+    creations = getattr(student, "creations", None) or []
+    count = 0
+    for c in creations:
+        if isinstance(c, dict) and c.get("type") == "problem":
+            count += 1
+    return count >= 10
+
+
 BADGE_DEFINITIONS = {
     "神射手": {
-        "description": "连续答对10题以上",
-        "trigger": lambda s: (s.combo or {}).get("best_all_time", 0) >= 10,
+        "description": "导弹发射弧线项目通关",
+        "trigger": _missile_completed,
     },
     "建筑大师": {
-        "description": "抽象思维评估 >= 0.8 或正确率超过85%",
-        "trigger": lambda s: getattr(
-            getattr(s, "cognitive_profile", None), "abstract_thinking", 0
-        ) >= 0.8 or getattr(
-            getattr(s, "student_profile", None), "independent_success_rate", 0
-        ) >= 0.85,
+        "description": "建筑项目通关（PBL完成关卡>=6 或冒险地图完成>=6关）",
+        "trigger": _builder_completed,
     },
     "建模侦探": {
-        "description": "出过5道题且成绩优秀",
-        "trigger": lambda s: len(getattr(s, "creations", []) or []) >= 5,
+        "description": "用方程解决3个真实问题（或PBL完成关卡>=3）",
+        "trigger": _modeling_detective,
     },
     "出题大师": {
         "description": "出过10道题",
-        "trigger": lambda s: len(getattr(s, "creations", []) or []) >= 10,
+        "trigger": _problem_master,
     },
     "思维达人": {
         "description": "有3个思维模型掌握度 >= 0.7",

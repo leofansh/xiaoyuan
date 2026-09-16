@@ -756,7 +756,7 @@ class CardDropRequest(BaseModel):
 
 class CardExchangeRequest(BaseModel):
     skin_id: str
-    cost: int
+    cost: int | None = None
 
 
 class TeachRequest(BaseModel):
@@ -902,7 +902,7 @@ async def cards_exchange(student_id: str, payload: CardExchangeRequest):
         s = _load_student(student_id)
         cards = ensure_cards(s.cards)
         try:
-            result = exchange_skin(cards, payload.skin_id, payload.cost)
+            result = exchange_skin(cards, payload.skin_id)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
         s.cards = cards
@@ -1048,6 +1048,12 @@ class PblComplete(BaseModel):
     hit: bool = False
     attempts: int = 1
     simulator_data: dict = {}
+
+
+class PblChoice(BaseModel):
+    student_id: str = ""
+    choice_id: str = ""
+    option_id: str = ""
 
 
 class CustomProjectCreate(BaseModel):
@@ -1244,6 +1250,35 @@ def pbl_knowledge(project_id: str, level_id: int, student_id: str = ""):
 
     s = _load_student(student_id)
     return project_knowledge(s, project_id, level_id)
+
+
+@app.get("/api/pbl/projects/{project_id}/pending-choice")
+def pbl_pending_choice(project_id: str, student_id: str = ""):
+    """11.7 剧情选择：查询当前待处理的选择点。"""
+    from backend.pbl.pbl_service import ensure_pbl, get_pending_choice
+
+    s = _load_student(student_id)
+    s.pbl_projects = ensure_pbl(s.pbl_projects)
+    return {"pending_choice": get_pending_choice(s, project_id)}
+
+
+@app.post("/api/pbl/projects/{project_id}/choice")
+async def pbl_answer_choice(project_id: str, payload: PblChoice):
+    """11.7 剧情选择：记录选择并返回引导话术。"""
+    from backend.pbl.pbl_service import answer_choice, ensure_pbl
+
+    sid = payload.student_id or ""
+    if not sid:
+        raise HTTPException(status_code=400, detail="缺少 student_id")
+    storage = get_storage()
+    lock = storage.get_lock(sid)
+    async with lock:
+        s = _load_student(sid)
+        s.pbl_projects = ensure_pbl(s.pbl_projects)
+        result = answer_choice(s, project_id, payload.choice_id, payload.option_id)
+        if result.get("success"):
+            storage.save(s)
+        return result
 
 
 @app.post("/api/custom-projects/{student_id}")

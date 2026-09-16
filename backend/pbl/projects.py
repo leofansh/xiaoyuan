@@ -186,6 +186,27 @@ PBL_PROJECTS: dict[str, dict] = {
                 ],
             },
         ],
+        "choices": [
+            {
+                "id": "lv2_wind_choice",
+                "at_level": 2,
+                "prompt": "风要来了。你想先训练什么？",
+                "options": [
+                    {
+                        "id": "wind_first",
+                        "label": "先练顶风射击",
+                        "hint": "顶风时导弹会被吹偏，射程变短",
+                        "focus": "wind",
+                    },
+                    {
+                        "id": "distance_first",
+                        "label": "先练远距离瞄准",
+                        "hint": "距离越远，角度误差被放大得越明显",
+                        "focus": "distance",
+                    },
+                ],
+            },
+        ],
         "badge": "badge_missile_master",
         "locked": False,
         "prerequisite_project": None,
