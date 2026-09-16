@@ -36,6 +36,12 @@ def start_session(student: Student, mood: str) -> dict:
     sess.topic_id = ""
     sess.blind_spots_today = []
     sess.errors_reviewed = 0
+    # V3.0 P0/I-11.9#4：挑战状态随会话重置（规格 11.9.4——每次会话可重新触发）
+    sess.challenge_state = ""
+    sess.challenge_problem_id = ""
+    sess.challenge_presented = False
+    # V3.0 P2/I-11.5：奇怪现象计数随会话重置（同一会话最多插 2 次，规格 11.5）
+    student.v3_meta["strange_inserted"] = 0
 
     get_storage().add_mood(student, mood)
 
@@ -56,6 +62,10 @@ def start_session(student: Student, mood: str) -> dict:
                     opening += f"\n\n对了，我有个有趣的问题想请教你：{opening_problem}"
             except ImportError:
                 pass
+        # V3.0 P2/I-11.7：连续剧情铺垫（昨天学会的技巧今天派上用场，规格 11.7）
+        _prelude = _yesterday_prelude(student)
+        if _prelude:
+            opening = f"{_prelude}\n\n{opening}"
         # V3.0 P2/I-11.5：开场好奇心钩子（悬念化开局，铺垫当天主题）
         try:
             from backend.agent.persona import pick_opening_hook
@@ -85,6 +95,21 @@ def start_session(student: Student, mood: str) -> dict:
     if due_reviews:
         names = "、".join(rs.topic_name for rs in due_reviews[:3])
         review_hint = f"今天有{len(due_reviews)}个知识点该复习了：{names}～"
+
+    # V3.0 P0/I-11.9#9：次日思考题询问（规格 11.9.5——第二天开场小圆主动问）
+    if not pure_mode:
+        _tp = student.insights.get("current_thinking_problem")
+        if _tp and not _tp.get("solved"):
+            try:
+                given_day = datetime.fromisoformat(_tp["given_at"]).date()
+                # 隔天（含更久）才问；当天留的题不当场追
+                if given_day < datetime.now().date():
+                    opening += (
+                        f"\n\n💭 昨天那道思考题，你有没有突然想通？"
+                        f"「{_tp['question']}」——不着急，好问题值得慢慢想。"
+                    )
+            except (ValueError, KeyError, TypeError):
+                pass
 
     return {
         "opening": opening,
@@ -139,6 +164,180 @@ _MODE_CONFIRM = {
 }
 
 
+_MINOR_CONFIRM_WORDS = {
+    "对", "嗯", "好", "是", "对呀", "对对", "嗯嗯", "好的", "是的",
+    "ok", "OK", "对啊", "对!",
+}
+
+
+def _is_minor_confirmation(msg: str) -> bool:
+    """对话小确认（"对""嗯"等）判定：确定性过滤，避免刷分（规格 5.3/5.8）。"""
+    if not msg:
+        return False
+    stripped = msg.strip()
+    if len(stripped) > 4:
+        return False
+    return stripped in _MINOR_CONFIRM_WORDS
+
+
+def _yesterday_prelude(student: Student) -> str:
+    """连续剧情铺垫（I-11.7）：昨天/近日学会的技巧，今天开场提一句。
+
+    取 session_history 最后一条，若日期在 1~3 天前且含话题名，返回铺垫话术。
+    """
+    if not student.session_history:
+        return ""
+    last = student.session_history[-1]
+    topic_name = (last.topic_name or "").strip()
+    if not topic_name or not last.date:
+        return ""
+    try:
+        last_day = datetime.strptime(last.date, "%Y-%m-%d").date()
+    except ValueError:
+        return ""
+    days_since = (datetime.now().date() - last_day).days
+    if not 1 <= days_since <= 3:
+        return ""
+    return (
+        f"🌸 昨天我们搞定了「{topic_name}」，今天可能会用到哦——"
+        "你昨天学会的技巧，今天要派上大用场啦！"
+    )
+
+
+# ============ V3.0 P0/I-11.9#4：主动挑战状态机（规格 11.9.4） ============
+_CHALLENGE_DECLINE_WORDS = ("不想", "不敢", "算了", "不要", "不挑战", "先不", "不了", "怕", "不试", "没兴趣", "下次", "太难了")
+_CHALLENGE_ACCEPT_WORDS = ("挑战", "试试", "来呀", "好啊", "好呀", "可以", "敢", "来吧", "想试", "要试")
+_CHALLENGE_GIVEUP_WORDS = ("不想做", "放弃", "不挑战了", "做不出来", "不做了", "太难了")
+
+
+def _maybe_open_challenge(student: Student) -> None:
+    """挑战机会窗口：掌握度达标或连续答对后，从题库选定一道挑战题（规格 11.9.4）。
+
+    仅在本次会话尚未邀请过、非纯学习模式、且处于教学环节时触发。
+    """
+    sess = student.current_session
+    if sess.challenge_state:
+        return
+    if get_pure_mode() or not sess.topic_id:
+        return
+    if sess.state in ("GREETING", "MODE_SELECT", "BLIND_SPOT") or sess.turn_count < 5:
+        return
+    mastery = student.mastery_score(sess.topic_id)
+    if mastery < 0.6 and sess.consecutive_correct < 2:
+        return
+    from backend.knowledge.challenge_problems import get_challenge_by_topic, get_random_challenge
+    prob = get_challenge_by_topic(sess.topic_id) or get_random_challenge(max_difficulty=4)
+    if not prob:
+        return
+    sess.challenge_state = "invited"
+    sess.challenge_problem_id = prob.id
+    sess.challenge_presented = False
+
+
+def _challenge_state_machine(student: Student, user_message: str) -> None:
+    """挑战状态机推进（规格 11.9.4）：
+
+    - invited → 孩子表态：接受 → active；拒绝 → declined
+      （不依赖 presented——即使 LLM 尚未复制完整题面，接受也立即推进，
+      persona active 分支会自然注入题目+提示）
+    - active 且孩子明确放弃 → declined（不算失败，绝不勉强）
+    """
+    sess = student.current_session
+    msg = user_message or ""
+    if sess.challenge_state == "invited":
+        if any(w in msg for w in _CHALLENGE_DECLINE_WORDS):
+            sess.challenge_state = "declined"
+        elif any(w in msg for w in _CHALLENGE_ACCEPT_WORDS):
+            sess.challenge_state = "active"
+    elif sess.challenge_state == "active" and any(w in msg for w in _CHALLENGE_GIVEUP_WORDS):
+        sess.challenge_state = "declined"
+
+
+def _challenge_present_confirm(student: Student, reply_text: str) -> None:
+    """确认小圆已真正发出挑战（含题目原文或任一邀请话术 → 标记 presented）。
+
+    presented 用于 persona 避免重复邀请文案；接受/拒绝判定由状态机独立完成。
+    """
+    sess = student.current_session
+    if sess.challenge_state != "invited" or sess.challenge_presented:
+        return
+    from backend.knowledge.challenge_problems import CHALLENGE_BANK
+    prob = next((p for p in CHALLENGE_BANK if p.id == sess.challenge_problem_id), None)
+    if prob and (prob.question[:12] in reply_text or prob.title in reply_text):
+        sess.challenge_presented = True
+        return
+    from backend.agent.persona import CHALLENGE_INVITE_PHRASES as _INVITES
+    if any(ph[:8] in reply_text for ph in _INVITES):
+        sess.challenge_presented = True
+
+
+def _settle_challenge_success(student: Student, *, independent_success: bool) -> list[dict]:
+    """挑战成功结算（规格 11.9.4：3-5倍XP + 必掉稀有以上卡 + 徽章 + 教学日志特别记录）。
+
+    仅当挑战处于 active 且本轮为独立答对时结算。
+    返回 challenge_success SSE 载荷（含掉落卡与徽章），空列表表示本轮无结算。
+    """
+    import random as _random
+
+    sess = student.current_session
+    # 挑战已真正呈现（presented 或进入 active）且本轮独立答对才结算——
+    # 放宽到 invited：孩子可能不明确说"好呀"就自顾自开始解题
+    if (not independent_success
+            or not sess.challenge_presented
+            or sess.challenge_state not in ("invited", "active")):
+        return []
+    from backend.knowledge.cards import drop_card, ensure_cards
+    from backend.services.pet import add_xp, ensure_pet
+
+    student.insights["challenge_completed"] = int(student.insights.get("challenge_completed", 0)) + 1
+
+    # 3-5 倍普通答题 XP（普通答对 +5）
+    xp = 5 * _random.randint(3, 5)
+    student.pet = ensure_pet(student.pet)
+    add_xp(student.pet, xp, source="challenge")
+
+    # 必掉稀有以上卡片（rare/epic/legendary）
+    force_rarity = _random.choice(["rare", "epic", "legendary"])
+    student.cards = ensure_cards(student.cards)
+    card_drop = drop_card(
+        student.cards, source="challenge",
+        knowledge_node=sess.topic_id, force_rarity=force_rarity,
+    )
+
+    # 挑战徽章（挑战者/难题杀手，规格 11.9.6）
+    challenge_badges = assessment.check_insight_badges(student, "")
+
+    # 教学日志特别记录（规格 11.9.4）
+    from backend.models.student import TeachingInsight
+    from backend.knowledge.challenge_problems import CHALLENGE_BANK
+    prob = next((p for p in CHALLENGE_BANK if p.id == sess.challenge_problem_id), None)
+    student.teaching_journal.append(TeachingInsight(
+        date=datetime.now().strftime("%Y-%m-%d"),
+        category="challenge",
+        insight=f"挑战成功：孩子独立完成了《{prob.title if prob else '挑战题'}》，获得 {xp} XP",
+        what_worked="主动挑战机制：掌握度达标后邀请挑战，大额奖励强化成就感",
+    ))
+
+    sess.challenge_state = "solved"
+    sess.challenge_problem_id = ""
+
+    badge_payload = None
+    if challenge_badges:
+        _b = challenge_badges[0]
+        badge_payload = {
+            "name": _b,
+            "icon": (Badge.ALL.get(_b) or {}).get("icon", "🏅"),
+            "desc": (Badge.ALL.get(_b) or {}).get("desc", ""),
+        }
+    return [{
+        "type": "challenge_success",
+        "title": prob.title if prob else "",
+        "xp_reward": xp,
+        "card_dropped": _drop_payload(card_drop) if card_drop.get("success") else None,
+        "badge_unlocked": badge_payload,
+    }]
+
+
 async def process_message(
     student: Student, user_message: str, *, external_extra: str = ""
 ) -> AsyncGenerator[dict, None]:
@@ -154,14 +353,30 @@ async def process_message(
 
     # V3.0 P0: 顿悟时刻检测（纯学习模式下关闭）
     insight = None
+    insight_card_drop = None
+    insight_badges: list[str] = []
     pure_mode = get_pure_mode()
     if not pure_mode:
         try:
-            from backend.services.insight_detector import detect_insight
-            insight = detect_insight(user_message, sess.history)
+            from backend.services.insight_detector import detect_insight, is_delayed_insight
+            # 延迟顿悟优先：存在未解决思考题时，"昨天那道题想通了"类信号优先于通用感叹词
+            insight = None
+            _tp = student.insights.get("current_thinking_problem")
+            if _tp and not _tp.get("solved"):
+                insight = is_delayed_insight(user_message)
+            if not insight:
+                insight = detect_insight(user_message, sess.history)
             if insight and insight.confidence >= 0.7:
                 sess.insight_today = getattr(sess, 'insight_today', 0) + 1
                 student.insights["total_count"] += 1
+                # 延迟顿悟：标记思考题已解决 + 计数（须在徽章判定前，供"想通5道"徽章读取）
+                if insight.insight_type == "delayed":
+                    _tp = student.insights.get("current_thinking_problem")
+                    if _tp and not _tp.get("solved"):
+                        _tp["solved"] = True
+                        student.insights["thinking_problems_solved"] = int(
+                            student.insights.get("thinking_problems_solved", 0)
+                        ) + 1
                 student.insights["history"].append({
                     "timestamp": datetime.now().isoformat(timespec="seconds"),
                     "type": insight.insight_type,
@@ -169,6 +384,20 @@ async def process_message(
                     "knowledge_node": sess.topic_id,
                     "xp_reward": 100,
                 })
+                # V3.0 P0/验收11.9#5：大额奖励结算 —— 宠物 +100 XP + 概率史诗/传说卡
+                import random as _random
+                from backend.knowledge.cards import drop_card, ensure_cards
+                from backend.services.pet import add_xp, ensure_pet
+                student.pet = ensure_pet(student.pet)
+                add_xp(student.pet, 100, source="insight")
+                student.cards = ensure_cards(student.cards)
+                force_rarity = "epic" if _random.random() < 0.7 else "legendary"
+                insight_card_drop = drop_card(
+                    student.cards, source="insight",
+                    knowledge_node=sess.topic_id, force_rarity=force_rarity,
+                )
+                # V3.0 P0/验收11.9#11：顿悟徽章判定（初次/思考者/达人/思想者/延迟顿悟）
+                insight_badges = assessment.check_insight_badges(student, insight.insight_type)
         except ImportError:
             pass
 
@@ -274,6 +503,11 @@ async def process_message(
         ):
             yield {"type": "mode_hint", "content": "show"}
 
+    # V3.0 P0/I-11.9#4：挑战状态机推进 + 机会窗口（规格 11.9.4，须在 prompt 组装前触发）
+    if not pure_mode:
+        _challenge_state_machine(student, user_message)
+        _maybe_open_challenge(student)
+
     system_prompt = persona.build_system_prompt(student)
 
     extras: list[str] = []
@@ -327,7 +561,8 @@ async def process_message(
 
     # EP-P0-1：认知负荷动态注入（高难度 + 低掌握度时限制信息量）
     if sess.topic_id:
-        node = syllabus.get_node(sess.topic_id)
+        from backend.knowledge import syllabus as _syl_load
+        node = _syl_load.get_node(sess.topic_id)
         if node and node.difficulty >= 4 and student.mastery_score(sess.topic_id) < 0.5:
             extras.append(
                 "[系统提示：当前知识点难度较高且学生掌握度低，"
@@ -433,24 +668,64 @@ async def process_message(
             # 有修正时，在回复末尾补充一句提示（可选，避免打断主体）
             pass
 
+    # V3.0 P0/I-11.9#4：挑战题面确认（规格 11.9.4——小圆真正发出题目后才接受表态）
+    if not pure_mode:
+        _challenge_present_confirm(student, reply_text)
+
     # 模拟逐字输出（打字机效果）
     for i in range(0, len(reply_text), 3):
         yield {"type": "text", "content": reply_text[i : i + 3]}
         await asyncio.sleep(0.01)
 
-    # V3.0 P0: 顿悟时刻庆祝 SSE（纯学习模式下关闭）
+    # V3.0 P2/I-11.5：奇怪现象（学习中低概率插入数学小悬念，规格 11.5）
+    if (
+        not pure_mode
+        and sess.state not in ("MODE_SELECT", "GREETING")
+        and sess.turn_count >= 3
+    ):
+        _strange_count = int(student.v3_meta.get("strange_inserted", 0))
+        if _strange_count < 2:
+            import random as _random_sp
+            if _random_sp.random() < 0.08:
+                try:
+                    from backend.agent.persona import pick_strange_phenomenon
+                    _phenomenon = pick_strange_phenomenon()
+                    if _phenomenon:
+                        student.v3_meta["strange_inserted"] = _strange_count + 1
+                        yield {"type": "text", "content": f"\n\n🧐 {_phenomenon}"}
+                except ImportError:
+                    pass
+
+    # V3.0 P0/I-11.9#5: 顿悟时刻庆祝 SSE（纯学习模式下关闭，规格 11.9.2）
     if not pure_mode and insight and insight.confidence >= 0.7:
+        card_payload = _drop_payload(insight_card_drop) if (
+            insight_card_drop and insight_card_drop.get("success")
+        ) else None
+        badge_payload = None
+        if insight_badges:
+            _b = insight_badges[0]
+            badge_payload = {
+                "name": _b,
+                "icon": (Badge.ALL.get(_b) or {}).get("icon", "🏅"),
+                "desc": (Badge.ALL.get(_b) or {}).get("desc", ""),
+            }
         yield {
-            "type": "insight",
+            "type": "insight_event",
             "insight_type": insight.insight_type,
             "student_quote": insight.student_quote[:100],
             "xp_reward": 100,
+            "card_dropped": card_payload,
+            "badge_unlocked": badge_payload,
             "effect": "golden_burst",
         }
 
     new_badges: list[str] = []
     if eval_data:
-        new_badges.extend(assessment.apply_eval(student, eval_data))
+        new_badges.extend(assessment.apply_eval(
+            student,
+            eval_data,
+            suppress_combo=_is_minor_confirmation(user_message),
+        ))
         state_now = student.current_session.state
 
         # V3.0 P1：推送游戏化奖励 SSE（combo_update / card_drop / pet_feed）
@@ -477,6 +752,18 @@ async def process_message(
         # V3.0 P2 模块D：冒险自动通关 SSE（规格 6.3.3，掌握度达标自动判定）
         for adv in assessment.pop_adventure_completions():
             yield {"type": "level_complete", "data": adv}
+
+        # V3.0 P0/I-11.9#4：挑战成功结算（规格 11.9.4——独立答对即大额奖励，
+        # 3-5倍XP + 必掉稀有以上卡 + 挑战徽章 + 教学日志特别记录）
+        _challenge_events = (
+            _settle_challenge_success(
+                student,
+                independent_success=eval_data.get("independent_success") is True,
+            )
+            if not pure_mode else []
+        )
+        for ev in _challenge_events:
+            yield ev
 
         # 从 eval 自动识别当前主题（优先 mastery_updates，其次 gaps_found/gaps_cleared）
         if not sess.topic_id:
@@ -661,6 +948,11 @@ def end_session(student: Student) -> dict:
                     "question": tp.question,
                     "given_at": datetime.now().isoformat(timespec="seconds"),
                     "solved": False,
+                }
+                # 展示给前端：告别弹窗亮出今日思考题（验收 11.9#9）
+                summary["thinking_problem"] = {
+                    "id": tp.id,
+                    "question": tp.question,
                 }
         except ImportError:
             pass
