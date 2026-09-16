@@ -51,6 +51,10 @@ class SessionState(BaseModel):
     # V3.0 P0：轻量首学模式
     lightweight_mode: bool = False
     insight_today: int = 0              # 今日顿悟次数
+    # V3.0 P0/I-11.9#4：主动挑战状态跟踪（规格 11.9.4）
+    challenge_state: str = ""           # "" | invited | active | solved | declined
+    challenge_problem_id: str = ""      # 当前挑战题 ID（CHALLENGE_BANK）
+    challenge_presented: bool = False   # 挑战题文本是否已由小圆发出
 
 
 class SessionSummary(BaseModel):
@@ -303,6 +307,16 @@ class Badge:
     THINKING_MODELING = "📊 建模思维达人"
     THINKING_VERIFY = "✅ 检验思维达人"
 
+    # ---- V3.0 P0: 顿悟徽章系统（规格 11.9.6，8 种） ----
+    INSIGHT_FIRST = "💡 初次顿悟"
+    INSIGHT_THINKER = "🤔 思考者"
+    INSIGHT_MASTER = "🌟 顿悟达人"
+    INSIGHT_SAGE = "🧠 思想者"
+    INSIGHT_DELAYED = "🌙 延迟顿悟"
+    INSIGHT_CHALLENGER = "⚔️ 挑战者"
+    INSIGHT_GIANT_KILLER = "🗡️ 难题杀手"
+    INSIGHT_PROBLEM_MASTER = "📚 思考题大师"
+
     ALL: dict[str, dict[str, str]] = {
         BLIND_HUNTER: {"desc": "第一次自己说出哪里没学踏实", "icon": "🔍"},
         DERIVE_BRAVE: {"desc": "第一次独立推导出核心公式", "icon": "🧗"},
@@ -321,4 +335,13 @@ class Badge:
         THINKING_HOLISTIC: {"desc": "整体思维掌握度达0.7", "icon": "🧩"},
         THINKING_MODELING: {"desc": "建模思维掌握度达0.7", "icon": "📊"},
         THINKING_VERIFY: {"desc": "检验思维掌握度达0.7", "icon": "✅"},
+        # 顿悟徽章（规格 11.9.6，解锁条件按 insights 计数/类型）
+        INSIGHT_FIRST: {"desc": "第一次体验到顿悟时刻", "icon": "💡"},
+        INSIGHT_THINKER: {"desc": "累计10次顿悟", "icon": "🤔"},
+        INSIGHT_MASTER: {"desc": "累计50次顿悟", "icon": "🌟"},
+        INSIGHT_SAGE: {"desc": "累计100次顿悟", "icon": "🧠"},
+        INSIGHT_DELAYED: {"desc": "在非学习时间主动说'昨天那道题我想通了'", "icon": "🌙"},
+        INSIGHT_CHALLENGER: {"desc": "完成第一道挑战题", "icon": "⚔️"},
+        INSIGHT_GIANT_KILLER: {"desc": "完成10道挑战题", "icon": "🗡️"},
+        INSIGHT_PROBLEM_MASTER: {"desc": "想通5道每日思考题", "icon": "📚"},
     }

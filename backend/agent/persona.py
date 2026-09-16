@@ -256,6 +256,56 @@ CO_CREATION_INSTRUCTIONS = """
 """
 
 
+# V3.0 P0/I-11.9#4：主动挑战邀请话术（规格 11.9.4）
+CHALLENGE_INVITE_PHRASES = [
+    "这道题有点难，目前只有10%的人做出来，你敢挑战吗？",
+    "今天有一道思考题，想不想试试？不想也没关系。",
+    "你最近状态超好，给你一道有点难度的，要不要试试？",
+]
+
+
+def _challenge_instructions(student: Student) -> str:
+    """V3.0 P0/I-11.9#4：主动挑战机制 prompt 注入（规格 11.9.4）。
+
+    状态由 chat.py 的挑战状态机维护（invited → active → solved/declined）：
+    - invited 且题目未呈现：给邀请话术 + 题库题目，让 LLM 自然发起挑战
+    - active：注入正在挑战的题目 + 逐级提示规则（校验 11.9.4 三条）
+    - 其余状态 / 纯学习模式：不注入
+    """
+    sess = student.current_session
+    state = sess.challenge_state or ""
+    if get_pure_mode() or state not in ("invited", "active"):
+        return ""
+    from backend.knowledge.challenge_problems import CHALLENGE_BANK
+    prob = next((p for p in CHALLENGE_BANK if p.id == sess.challenge_problem_id), None)
+    if not prob:
+        return ""
+    hints = "\n".join(f"{i + 1}. {h}" for i, h in enumerate(prob.hints))
+    if state == "active":
+        return (
+            "## 孩子正在挑战的题（规格 11.9.4）\n"
+            f"题目：《{prob.title}》（难度 {prob.difficulty} 星，预计 {prob.estimated_minutes} 分钟）\n"
+            f"{prob.question}\n"
+            f"提示线索（孩子卡壳时逐级给，不要一次给完）：\n{hints}\n"
+            f"（参考思路：{prob.solution_approach}）\n"
+            "规则：引导独立思考；卡壳→只给一级提示；她说出答案后请她讲思路；"
+            "讲通后真心庆祝。她若放弃就完全接纳，绝不批评。"
+        )
+    if sess.challenge_presented:
+        return ""  # 题目已发出，等待孩子回应，不重复文案
+    return (
+        "## 可以发起挑战（规格 11.9.4，可选）\n"
+        "趁现在这个自然时机，用下面话术之一邀请孩子挑战一道趣味题"
+        "（她拒绝就立刻放下，绝不勉强）：\n"
+        + "\n".join(f"- 「{p}」" for p in CHALLENGE_INVITE_PHRASES)
+        + f"\n若她答应，请一字不差地出这道题：\n"
+        f"《{prob.title}》（难度 {prob.difficulty} 星，预计 {prob.estimated_minutes} 分钟）\n"
+        f"{prob.question}\n"
+        "（卡壳时逐级给提示，不直接给答案；她完整答出并讲清思路后，"
+        "后台会自动结算大额奖励，你只需真诚表扬）"
+    )
+
+
 PHOTO_GUIDE = """
 ## 本轮特殊指令：学生发来了题目照片
 系统已用OCR识别出照片上的文字，并尝试识别数学公式（LaTeX格式），随消息附给你。
@@ -509,6 +559,11 @@ def build_system_prompt(student: Student) -> str:
     if thinking_hint:
         context_parts.append(thinking_hint)
 
+    # V3.0 P0/I-11.9#4：主动挑战机制注入（规格 11.9.4）
+    challenge_ctx = _challenge_instructions(student)
+    if challenge_ctx:
+        context_parts.append(challenge_ctx)
+
     return prompt + "\n".join(context_parts)
 
 
@@ -623,6 +678,28 @@ def pick_closing_hook() -> str:
     import random
 
     return random.choice(CLOSING_HOOKS)
+
+
+# --- 奇怪现象库（I-11.5）：学习中随机插入的数学小悬念 + 简短解释 ---
+STRANGE_PHENOMENA: list[str] = [
+    "你发现了吗？98×5 加上 2×5 不用一个个乘——把 98 和 2 先凑成 100，再乘 5，一下就是 500！这就是乘法分配律在偷偷帮你提速。",
+    "你发现了吗？113×2 根本不用列竖式——100×2=200，13×2=26，加起来就是 226。把大数拆成整十整百，心算一下子变快。",
+    "你发现了吗？0.5 和 50% 其实是同一个数——小数点往右挪两位再加个百分号，0.5 就变成 50% 了，它们说的都是“一半”。",
+    "你发现了吗？一个数乘 11 有个怪招：23×11 把 2 和 3 往两边一放，中间填 2+3=5，直接得到 253！",
+    "你发现了吗？一个数的各位相加能被 9 整除，这个数就能被 9 整除——18 的 1+8=9，108 的 1+0+8=9，都是 9 的倍数。",
+    "你发现了吗？除以 5 不用真的除——先乘 2 再除以 10 就行：60÷5 = (60×2)÷10 = 120÷10 = 12，快了一倍。",
+    "你发现了吗？15×15、25×25 这种“几十五的平方”有规律：十位数乘(十位数+1) 写前面，后面接 25——35² 就是 3×4=12 接 25，等于 1225！",
+    "你发现了吗？偶数乘 5 其实就是它的一半再乘 10：46×5 = 23×10 = 230，比竖式快多了。",
+    "你发现了吗？相邻两个数，它们的平方差正好等于这两个数之和：8²−7²=15，而 8+7 也等于 15！",
+    "你发现了吗？任何数乘 1 都还是它自己，但 1 是数学里最安静的“隐身侠”——它不改变别人，却撑起了整个乘法的世界。",
+]
+
+
+def pick_strange_phenomenon() -> str:
+    """随机选一条奇怪现象（I-11.5）。"""
+    import random
+
+    return random.choice(STRANGE_PHENOMENA)
 
 
 def fun_fact_unlock(student) -> dict | None:

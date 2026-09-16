@@ -42,11 +42,14 @@ VALID_TRANSITIONS = {
 }
 
 
-def apply_eval(student: Student, eval_data: dict) -> list[str]:
+def apply_eval(student: Student, eval_data: dict, *, suppress_combo: bool = False) -> list[str]:
     """把AI评估块应用到学生档案，返回新触发的徽章列表。
 
     V3.0 P1：内部同时处理 combo / 宠物XP / 卡片掉落（P1 游戏化三件套）。
     奖励事件写入模块级 _P1_REWARDS，由 chat 层通过 pop_p1_rewards() 取出推送 SSE。
+
+    suppress_combo：对话小确认（"对""嗯"等）时置 True，跳过 combo+1/归零，
+    但仍处理 newly_mastered 掉落与宠物 XP（规格 5.3/5.8，避免刷分）。
     """
     new_badges: list[str] = []
 
@@ -278,6 +281,7 @@ def apply_eval(student: Student, eval_data: dict) -> list[str]:
             independent_success=independent_success,
             newly_mastered=newly_mastered,
             is_answer_eval=is_answer_eval,
+            suppress_combo=suppress_combo,
         )
     )
 
@@ -299,6 +303,16 @@ _COMBO_MESSAGES = {
     "combo_5": "超棒！5连击了！",
     "combo_10": "哇！10连击！你是数学小天才！",
 }
+
+# 答错归零的温和鼓励话术（规格 5.3/5.8：答错不惩罚，只是归零并鼓励）
+_COMBO_RESET_ENCOURAGEMENT: list[str] = [
+    "没关系，连击断了，但勇气还在！",
+    "答错是宝藏，我们把它变成经验值！",
+    "别在意连击，重要的是我们弄懂了这题！",
+    "连击清零啦，正好轻装上阵，下一题重新起飞！",
+    "这次没连上没关系，你的努力我一直记着哦～",
+    "错一次没什么大不了，敢尝试就已经很棒了！",
+]
 
 
 def pop_p1_rewards() -> dict:
@@ -371,7 +385,8 @@ def _auto_complete_adventure_levels(student: Student, newly_mastered: list[str])
 
 
 def _apply_p1_rewards(student: Student, *, independent_success: bool,
-                      newly_mastered: list[str], is_answer_eval: bool) -> dict:
+                      newly_mastered: list[str], is_answer_eval: bool,
+                      suppress_combo: bool = False) -> dict:
     """组合 模块C(combo) + 模块A(宠物XP) + 模块B(卡片) 的奖励逻辑。
 
     触发条件（规格 5.3）：仅"主动答题并被评估"计 combo；
@@ -405,7 +420,8 @@ def _apply_p1_rewards(student: Student, *, independent_success: bool,
     combo.setdefault("total_combos_10", 0)
 
     # ---------- 答对（评估块确认）：combo+1 + XP + 概率掉卡 ----------
-    if independent_success:
+    # suppress_combo（小确认"对/嗯"）时跳过 combo+1/归零，但仍处理掌握度掉落与宠物 XP
+    if not suppress_combo and independent_success:
         prev = combo["current"]
         combo["current"] = prev + 1
         current = combo["current"]
@@ -455,7 +471,7 @@ def _apply_p1_rewards(student: Student, *, independent_success: bool,
             if dc["dropped"] and rewards["card_drop"] is None:
                 rewards["card_drop"] = dc
 
-    elif is_answer_eval:
+    elif not suppress_combo and is_answer_eval:
         # ---------- 答错（明确答题被评估）：combo 归零，不惩罚 ----------
         if combo["current"] > 0:
             combo["current"] = 0
@@ -464,7 +480,7 @@ def _apply_p1_rewards(student: Student, *, independent_success: bool,
                 "previous": combo["current"],
                 "milestone": None,
                 "xp_bonus": 0,
-                "message": "",
+                "message": _random.choice(_COMBO_RESET_ENCOURAGEMENT),
             }
 
     # ---------- 新掌握知识点（≥0.7）：必掉卡 + 宠物+30XP（规格3.2/4.2） ----------
@@ -520,6 +536,51 @@ def check_transfer_badge(student: Student, state: str) -> bool:
                 student.badges.append(Badge.TRANSFER)
                 return True
     return False
+
+
+def check_insight_badges(student: Student, insight_type: str = "") -> list[str]:
+    """顿悟徽章判定（规格 11.9.6，8 种）。
+
+    输入：本次顿悟类型（insight_type，如 "delayed" 触发延迟顿悟徽章）。
+    返回本次新获得的徽章列表（供 SSE badge_unlocked 展示）。
+    """
+    new_badges: list[str] = []
+    ins = student.insights or {}
+    total = int(ins.get("total_count", 0))
+
+    # 累计次数里程碑（初次顿悟 1 / 思考者 10 / 顿悟达人 50 / 思想者 100）
+    milestones = [
+        (1, Badge.INSIGHT_FIRST),
+        (10, Badge.INSIGHT_THINKER),
+        (50, Badge.INSIGHT_MASTER),
+        (100, Badge.INSIGHT_SAGE),
+    ]
+    for threshold, badge in milestones:
+        if total >= threshold and badge not in student.badges:
+            student.badges.append(badge)
+            new_badges.append(badge)
+
+    # 延迟顿悟：非学习时间主动说出"昨天那道题我想通了"
+    if insight_type == "delayed" and Badge.INSIGHT_DELAYED not in student.badges:
+        student.badges.append(Badge.INSIGHT_DELAYED)
+        new_badges.append(Badge.INSIGHT_DELAYED)
+
+    # 挑战题：完成第 1 道 / 第 10 道
+    challenges = int(ins.get("challenge_completed", 0))
+    if challenges >= 1 and Badge.INSIGHT_CHALLENGER not in student.badges:
+        student.badges.append(Badge.INSIGHT_CHALLENGER)
+        new_badges.append(Badge.INSIGHT_CHALLENGER)
+    if challenges >= 10 and Badge.INSIGHT_GIANT_KILLER not in student.badges:
+        student.badges.append(Badge.INSIGHT_GIANT_KILLER)
+        new_badges.append(Badge.INSIGHT_GIANT_KILLER)
+
+    # 每日思考题：想通 5 道
+    solved = int(ins.get("thinking_problems_solved", 0))
+    if solved >= 5 and Badge.INSIGHT_PROBLEM_MASTER not in student.badges:
+        student.badges.append(Badge.INSIGHT_PROBLEM_MASTER)
+        new_badges.append(Badge.INSIGHT_PROBLEM_MASTER)
+
+    return new_badges
 
 
 def record_blind_spot(student: Student, text: str) -> None:
