@@ -12,4 +12,5 @@ data/config.json
 build/
 dist/
 server.log
+temp/
 1.13.0
