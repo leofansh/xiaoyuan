@@ -151,13 +151,24 @@
   color: #e6a817;
   margin-bottom: 12px;
 }
-.card-drop-body { position: relative; display: flex; justify-content: center; margin: 6px 0 12px; }
+.card-drop-body { position: relative; display: flex; justify-content: center; margin: 6px 0 12px; perspective: 900px; }
 .big-card {
   width: 150px;
   height: 200px;
   border-radius: 16px;
+  position: relative;
+  transform-style: preserve-3d;
+  transform: rotateY(180deg);          /* 初始显示背面 */
+  transition: transform .6s cubic-bezier(.4,.2,.2,1);
+}
+.big-card.flipped { transform: rotateY(360deg); }  /* 翻到正面 */
+.big-card .big-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
   border: 3px solid var(--card-rarity, #ccc);
-  background: #fff;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -167,6 +178,13 @@
   text-align: center;
   box-shadow: 0 8px 28px rgba(0,0,0,.18);
 }
+.big-card .big-face-front { background: #fff; }
+.big-card .big-face-back {
+  background: repeating-linear-gradient(45deg, #f3efe6 0 10px, #fff 10px 20px);
+  transform: rotateY(180deg);
+}
+.big-card .big-back-q { font-size: 64px; font-weight: 800; color: var(--card-rarity, #ccc); line-height: 1; }
+.big-card .big-back-hint { font-size: 24px; }
 .big-card .big-icon { font-size: 52px; }
 .big-card .big-name { font-size: 15px; font-weight: 800; color: #5a4a4d; }
 .big-card .big-text { font-size: 12px; color: var(--muted); line-height: 1.4; }

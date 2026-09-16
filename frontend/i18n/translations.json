@@ -41,6 +41,8 @@
     "status.topic": "📌 今天聚焦：待会儿选",
     "status.time": "⏱ 0分钟",
     "status.confidence": "💪 --",
+    "identity.title": "身份",
+    "identity.chip": "🏅 {title}",
     
     "pomodoro.study": "学",
     "pomodoro.rest": "息",
@@ -91,7 +93,26 @@
     "thinking_daily.solved": "想通了！",
     "mastery.on_track": "还在加油中",
     "mastery.mastered": "已经掌握了",
-    "mastery.new_gain": "又进步了一点！"
+    "mastery.new_gain": "又进步了一点！",
+    "nav.creations": "🎨 我的作品",
+    "input.problem": "📝 出一道题",
+    "creations.title": "🎨 我的作品",
+    "creations.newProblem": "📝 出一道题",
+    "creations.empty": "还没有作品。来出一道题考考小圆吧～",
+    "creations.problemTag": "我出的题",
+    "creations.teachTag": "我的讲解",
+    "creations.judgedRight": "小圆答对了",
+    "creations.judgedWrong": "小圆答错了",
+    "problem.modalTitle": "出一道题考考小圆 🐱",
+    "problem.placeholder": "写下你的题目…（比如：99×99 等于多少？）",
+    "problem.answerPlaceholder": "参考答案（可留空）",
+    "problem.judgeHint": "小圆做完后，你来判个分👇",
+    "problem.correct": "小圆答对了 😄",
+    "problem.wrong": "小圆答错了 🤔",
+    "problem.emptyError": "先把题目写出来嘛～",
+    "problem.saved": "题目收进你的题库啦！",
+    "problem.cardGot": "掉落了",
+    "problem.networkError": "网络开小差了，再试一次好吗？"
   },
   
   "en": {
@@ -136,6 +157,8 @@
     "status.topic": "📌 Today's Focus: Choose later",
     "status.time": "⏱ 0 min",
     "status.confidence": "💪 --",
+    "identity.title": "Identity",
+    "identity.chip": "🏅 {title}",
     
     "pomodoro.study": "Study",
     "pomodoro.rest": "Rest",
@@ -186,6 +209,25 @@
     "thinking_daily.solved": "I got it!",
     "mastery.on_track": "Still getting there",
     "mastery.mastered": "Already mastered",
-    "mastery.new_gain": "Getting better!"
+    "mastery.new_gain": "Getting better!",
+    "nav.creations": "🎨 My Works",
+    "input.problem": "📝 Make a Problem",
+    "creations.title": "🎨 My Works",
+    "creations.newProblem": "📝 Make a Problem",
+    "creations.empty": "No creations yet. Make a problem and challenge Xiao Yuan~",
+    "creations.problemTag": "My Problem",
+    "creations.teachTag": "My Teaching",
+    "creations.judgedRight": "Xiao Yuan got it right",
+    "creations.judgedWrong": "Xiao Yuan got it wrong",
+    "problem.modalTitle": "Make a problem for Xiao Yuan 🐱",
+    "problem.placeholder": "Write your problem... (e.g. What is 99 × 99?)",
+    "problem.answerPlaceholder": "Reference answer (optional)",
+    "problem.judgeHint": "After Xiao Yuan solves it, you judge👇",
+    "problem.correct": "Xiao Yuan got it 😄",
+    "problem.wrong": "Xiao Yuan got it wrong 🤔",
+    "problem.emptyError": "Write your problem first~",
+    "problem.saved": "Problem saved to your collection!",
+    "problem.cardGot": "Dropped",
+    "problem.networkError": "Network hiccup. Try again?"
   }
 }

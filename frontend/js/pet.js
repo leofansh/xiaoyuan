@@ -54,23 +54,65 @@ function petXpFloat(amount) {
 /* ---------------- SSE pet_feed 事件处理 ---------------- */
 function handlePetFeedSSE(data) {
   if (!data) return;
-  const pet = data.pet || petCache;
+  const prevPet = petCache;
+  const pet = data.pet || prevPet;
   const events = data.events || [];
   const xpTotal = events.reduce((s, ev) => s + (ev.amount || 0), 0);
   if (xpTotal) petXpFloat(xpTotal);
-  if (events.some(ev => ev.leveled_up)) {
-    toast(`🎉 宠物升级到 Lv.${pet ? pet.level : "?"}！`, 3500);
-    celebrate();
-  }
-  const newSkin = events.find(ev => ev.unlocked_skin);
-  if (newSkin) {
-    const info = PET_SKIN_INFO[newSkin.unlocked_skin];
-    toast(`✨ 新皮肤：${info ? info.name : newSkin.unlocked_skin} 解锁！`, 3200);
-  }
+
+  const leveledUp = events.some(ev => ev.leveled_up);
+
+  // 本次新解锁皮肤：对比旧/新 unlocked_skins + 事件字段
+  const oldSkins = new Set((prevPet && prevPet.unlocked_skins) || []);
+  const newSkins = new Set((pet && pet.unlocked_skins) || []);
+  const unlockedSkins = [];
+  newSkins.forEach(id => { if (!oldSkins.has(id)) unlockedSkins.push(id); });
+  const evSkin = events.find(ev => ev.unlocked_skin);
+  if (evSkin && unlockedSkins.indexOf(evSkin.unlocked_skin) === -1) unlockedSkins.push(evSkin.unlocked_skin);
+
   if (pet) {
     petCache = pet;
     renderPetAvatar(pet);
   }
+
+  if (leveledUp) {
+    showPetLevelUpModal({
+      oldLevel: prevPet ? prevPet.level : null,
+      newLevel: pet ? pet.level : null,
+      unlockedSkins,
+    });
+  } else if (unlockedSkins.length) {
+    unlockedSkins.forEach(id => {
+      const info = PET_SKIN_INFO[id];
+      toast(`✨ 新皮肤：${info ? info.name : id} 解锁！`, 3200);
+    });
+  }
+}
+
+/* ---------------- 升级庆祝弹窗（规格 3.7 PetLevelUpModal） ---------------- */
+function showPetLevelUpModal({ oldLevel, newLevel, unlockedSkins }) {
+  const emoji = petFaceEmoji(petCache);
+  const skinLines = (unlockedSkins || []).map(id => {
+    const info = PET_SKIN_INFO[id];
+    return info ? `<span class="levelup-skin"><span class="skin-emoji">${info.emoji}</span>${info.name}</span>` : "";
+  }).filter(Boolean).join("");
+
+  const overlay = document.createElement("div");
+  overlay.className = "pet-levelup-overlay";
+  overlay.innerHTML = `
+    <div class="pet-levelup-card">
+      <div class="levelup-emoji">${emoji}</div>
+      <div class="levelup-title">🎉</div>
+      <div class="levelup-text">Lv.${oldLevel ?? "?"} → Lv.${newLevel ?? "?"} 升级啦！</div>
+      ${skinLines ? `<div class="levelup-skins">${skinLines}</div>` : ""}
+      <button class="levelup-btn">太棒了！</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  const close = () => overlay.remove();
+  overlay.onclick = e => {
+    if (e.target === overlay || e.target.closest(".levelup-btn")) close();
+  };
+  celebrate();
 }
 
 /* ---------------- 宠物加载与面板 ---------------- */
@@ -212,7 +254,20 @@ async function petInteract() {
   try {
     const res = await api(`/api/pet/${studentId}/interact`, null, "GET");
     if (res && res.message) toast("🐾 宠物：" + res.message, 2600);
-  } catch (_) { /* 静默 */ }
+    return res;
+  } catch (_) { return null; }
+}
+
+/* 宠物头像点击 → 随机互动语音 + 对应 CSS 动画（规格 3.7） */
+function playPetInteract() {
+  petInteract().then(res => {
+    if (!res || !res.animation) return;
+    const box = $("#pet-avatar");
+    if (!box) return;
+    const cls = "pet-anim-" + res.animation;
+    box.classList.add(cls);
+    setTimeout(() => box.classList.remove(cls), 500);
+  }).catch(() => {});
 }
 
 async function renamePet() {

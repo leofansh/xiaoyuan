@@ -314,6 +314,100 @@ body {
 }
 .thinking-model-tag.hidden { display: none; }
 
+/* 聊天页身份标签 chip（规格 11.4 身份展示） */
+.identity-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--light);
+  border: 1.5px solid var(--main);
+  border-radius: 999px;
+  padding: 2px 10px;
+  white-space: nowrap;
+}
+.identity-chip.hidden { display: none; }
+
+/* 宠物互动动画（规格 3.7：happy_jump/sparkle/spin/wooble） */
+.pet-avatar.pet-anim-happy_jump { animation: pet-happy-jump .5s ease; }
+@keyframes pet-happy-jump {
+  0%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-16px) scale(1.1, .95); }
+  50% { transform: translateY(0) scale(.98, 1.05); }
+  70% { transform: translateY(-8px) scale(1.05); }
+}
+.pet-avatar.pet-anim-sparkle { animation: pet-sparkle .5s ease; }
+@keyframes pet-sparkle {
+  0%, 100% { filter: none; transform: scale(1); }
+  25% { filter: brightness(1.3) drop-shadow(0 0 6px gold); transform: scale(1.08); }
+  50% { filter: brightness(1.05); transform: scale(1); }
+  75% { filter: brightness(1.35) drop-shadow(0 0 8px gold); transform: scale(1.06) rotate(6deg); }
+}
+.pet-avatar.pet-anim-spin { animation: pet-spin .5s ease-in-out; }
+@keyframes pet-spin {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.15); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+.pet-avatar.pet-anim-wooble { animation: pet-wooble .5s ease; }
+@keyframes pet-wooble {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(-14deg); }
+  40% { transform: rotate(12deg); }
+  60% { transform: rotate(-8deg); }
+  80% { transform: rotate(6deg); }
+}
+
+/* 宠物升级庆祝弹窗（规格 3.7 PetLevelUpModal） */
+.pet-levelup-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 140;
+  background: rgba(0,0,0,.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: levelup-fade-in .25s ease;
+}
+@keyframes levelup-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.pet-levelup-card {
+  width: min(340px, 86vw);
+  background: linear-gradient(160deg, #fff8ef, #fff);
+  border-radius: 24px;
+  padding: 28px 24px;
+  text-align: center;
+  box-shadow: var(--card-shadow);
+  animation: levelup-pop .5s cubic-bezier(.2,1.4,.4,1);
+}
+@keyframes levelup-pop {
+  0% { transform: scale(.5); opacity: 0; }
+  70% { transform: scale(1.08); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.pet-levelup-card .levelup-emoji { font-size: 64px; line-height: 1; }
+.pet-levelup-card .levelup-title { font-size: 34px; margin: 4px 0 6px; }
+.pet-levelup-card .levelup-text { font-size: 17px; font-weight: 800; color: var(--accent); margin-bottom: 10px; }
+.pet-levelup-card .levelup-skins {
+  display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 0 0 14px;
+}
+.pet-levelup-card .levelup-skin {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; font-weight: 600; color: var(--accent);
+  background: var(--light); border: 1.5px solid var(--main);
+  border-radius: 999px; padding: 3px 10px;
+}
+.pet-levelup-card .levelup-skin .skin-emoji { font-size: 14px; }
+.pet-levelup-card .levelup-btn {
+  display: inline-block;
+  background: linear-gradient(135deg, var(--main), var(--main-strong));
+  color: #fff; border: none; border-radius: 999px;
+  padding: 10px 26px; font-size: 15px; font-weight: 700; cursor: pointer;
+  box-shadow: var(--soft-shadow);
+}
+.pet-levelup-card .levelup-btn:hover { transform: translateY(-1px); }
+
 /* ---------------- 番茄闹钟（悬浮图标） ---------------- */
 .pomodoro-float {
   position: fixed; bottom: 80px; right: 16px; z-index: 100;

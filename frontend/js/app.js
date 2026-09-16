@@ -436,9 +436,12 @@ $all(".mood-btn").forEach(btn => {
   };
 });
 
-// V3.0 P1: 宠物头像点击 → 打开宠物面板
+// V3.0 P1: 宠物头像点击 → 互动语音+动画 → 打开宠物面板
 document.addEventListener("click", e => {
-  if (e.target.closest("#pet-avatar")) openPetPanel();
+  if (e.target.closest("#pet-avatar")) {
+    playPetInteract();
+    openPetPanel();
+  }
 });
 
 let modeBarShown = false;  // 跟踪模式选择条是否已显示
@@ -554,8 +557,8 @@ async function consumeSSE(resp, bubble) {
         scrollBottom();
       } else if (type === "eval") {
         handleEval(data);
-      } else if (type === "insight") {
-        // V3.0 P0: 顿悟时刻庆祝
+      } else if (type === "insight_event") {
+        // V3.0 P0/I-11.9#5: 顿悟时刻庆祝（规格 11.9.2）
         bubble.classList.remove("typing-dot");
         const quote = data.student_quote || "";
         bubble.innerHTML = renderMathText(
@@ -565,6 +568,37 @@ async function consumeSSE(resp, bubble) {
         triggerInsightEffect();
         if (data.xp_reward) {
           toast(`✨ 顿悟奖励 +${data.xp_reward} XP！`, 3000);
+        }
+        if (data.card_dropped && data.card_dropped.card) {
+          setTimeout(() => handleCardDropSSE(data.card_dropped), 700);
+        }
+        if (data.badge_unlocked && data.badge_unlocked.name) {
+          const bn = data.badge_unlocked.name;
+          const bic = data.badge_unlocked.icon || "🏅";
+          const bdesc = data.badge_unlocked.desc || "";
+          toast(`${bic} 获得顿悟徽章：${bn}${bdesc ? " — " + bdesc : ""}`, 4000);
+        }
+        scrollBottom();
+      } else if (type === "challenge_success") {
+        // V3.0 P0/I-11.9#4: 挑战成功庆祝（规格 11.9.4：3-5倍XP + 必掉稀有以上卡）
+        bubble.classList.remove("typing-dot");
+        const chTitle = data.title || "挑战题";
+        bubble.innerHTML = renderMathText(
+          `🏆 太棒了！你独立完成了挑战《${chTitle}》！\n\n` +
+          `这种迎难而上的勇气，比答案本身更了不起！小圆为你骄傲！🌟`
+        );
+        triggerInsightEffect();
+        if (data.xp_reward) {
+          toast(`🏆 挑战成功 +${data.xp_reward} XP！`, 3000);
+        }
+        if (data.card_dropped && data.card_dropped.card) {
+          setTimeout(() => handleCardDropSSE(data.card_dropped), 700);
+        }
+        if (data.badge_unlocked && data.badge_unlocked.name) {
+          const bn = data.badge_unlocked.name;
+          const bic = data.badge_unlocked.icon || "🏅";
+          const bdesc = data.badge_unlocked.desc || "";
+          toast(`${bic} 获得挑战徽章：${bn}${bdesc ? " — " + bdesc : ""}`, 4000);
         }
         scrollBottom();
       } else if (type === "combo_update") {
@@ -642,6 +676,126 @@ document.addEventListener("click", e => {
     $("#plus-menu").classList.add("hidden");
   }
 });
+
+// ---------------------------------------------------------------- 孩子出题（I-11.3 出题 UI）
+$("#btn-problem").onclick = () => {
+  $("#plus-menu").classList.add("hidden");
+  openProblemModal();
+};
+$("#btn-create-problem").onclick = () => openProblemModal();
+
+function openProblemModal() {
+  const i18n = window.I18n;
+  const mask = document.createElement("div");
+  mask.style.cssText =
+    "position:fixed;inset:0;background:rgba(30,30,30,.5);z-index:9999;" +
+    "display:flex;align-items:center;justify-content:center;animation:comboFadeIn .25s ease;";
+  const box = document.createElement("div");
+  box.style.cssText =
+    "background:var(--card-bg,#fff);border-radius:18px;padding:26px 24px;" +
+    "max-width:440px;width:90%;box-shadow:0 12px 40px rgba(0,0,0,.28);";
+  const head = document.createElement("div");
+  head.textContent = i18n.t("problem.modalTitle");
+  head.style.cssText = "font-weight:600;font-size:16px;margin-bottom:14px;text-align:center;";
+  const ta = document.createElement("textarea");
+  ta.id = "problem-input";
+  ta.placeholder = i18n.t("problem.placeholder");
+  ta.style.cssText =
+    "width:100%;box-sizing:border-box;height:84px;resize:vertical;border:1px solid #ddd;" +
+    "border-radius:10px;padding:10px;font-size:15px;font-family:inherit;";
+  const ans = document.createElement("input");
+  ans.id = "problem-answer";
+  ans.placeholder = i18n.t("problem.answerPlaceholder");
+  ans.style.cssText =
+    "width:100%;box-sizing:border-box;margin-top:10px;border:1px solid #ddd;" +
+    "border-radius:10px;padding:10px;font-size:15px;font-family:inherit;";
+  const hint = document.createElement("div");
+  hint.textContent = i18n.t("problem.judgeHint");
+  hint.style.cssText = "font-size:13px;color:var(--muted,#888);margin:14px 0 8px;text-align:center;";
+  const row = document.createElement("div");
+  row.style.cssText = "display:flex;gap:10px;justify-content:center;";
+  const okBtn = document.createElement("button");
+  okBtn.textContent = i18n.t("problem.correct");
+  okBtn.style.cssText =
+    "background:linear-gradient(135deg,#8fc7a0,#5da377);color:#fff;border:none;" +
+    "border-radius:999px;padding:10px 18px;font-size:14px;cursor:pointer;";
+  const noBtn = document.createElement("button");
+  noBtn.textContent = i18n.t("problem.wrong");
+  noBtn.style.cssText =
+    "background:linear-gradient(135deg,#f0b06b,#e08a3c);color:#fff;border:none;" +
+    "border-radius:999px;padding:10px 18px;font-size:14px;cursor:pointer;";
+  const close = () => mask.remove();
+  mask.onclick = e => { if (e.target === mask) close(); };
+  okBtn.onclick = () => { close(); submitProblem(ta.value, ans.value, true); };
+  noBtn.onclick = () => { close(); submitProblem(ta.value, ans.value, false); };
+  row.append(okBtn, noBtn);
+  box.append(head, ta, ans, hint, row);
+  mask.appendChild(box);
+  document.body.appendChild(mask);
+  ta.focus();
+}
+
+async function submitProblem(problem, answer, judge) {
+  problem = (problem || "").trim();
+  if (!problem) {
+    toast(window.I18n.t("problem.emptyError"), 2200);
+    return;
+  }
+  try {
+    const res = await api(`/api/problems/${studentId}/create`, {
+      problem,
+      answer: (answer || "").trim(),
+      judge,
+    });
+    let tip = window.I18n.t("problem.saved");
+    if (res.pet_feed && res.pet_feed.xp_gained) tip += ` +${res.pet_feed.xp_gained} XP`;
+    if (res.card_drop && res.card_drop.dropped && res.card_drop.card) {
+      tip += ` ${window.I18n.t("problem.cardGot")}「${escapeHtml(res.card_drop.card.name)}」(${res.card_drop.card.rarity})`;
+    }
+    toast(tip, 3200);
+    triggerInsightEffect();
+    if (currentView === "creations") renderCreations();
+  } catch (e) {
+    toast((e && e.message) || window.I18n.t("problem.networkError"), 3200);
+  }
+}
+
+// ---------------------------------------------------------------- 作品墙（I-11.3 作品展示）
+async function renderCreations() {
+  const wrap = $("#creations-list");
+  if (!wrap) return;
+  try {
+    const res = await api(`/api/creations/${studentId}`, null, "GET");
+    if (!res.creations || !res.creations.length) {
+      wrap.innerHTML = `<div class="history-empty">${window.I18n.t("creations.empty")}</div>`;
+      return;
+    }
+    wrap.innerHTML = "";
+    res.creations.forEach(c => {
+      const date = (c.created_at || "").slice(0, 10);
+      const div = document.createElement("div");
+      div.className = "history-item";
+      if (c.type === "problem") {
+        div.innerHTML = `
+          <div class="history-date"><span>📝 ${window.I18n.t("creations.problemTag")}</span><span>${date}</span></div>
+          <div class="history-topic">${escapeHtml(c.problem)}</div>
+          <div class="history-meta"><span>${c.judged_correct ? "😄" : "🤔"} ${c.judged_correct
+            ? window.I18n.t("creations.judgedRight")
+            : window.I18n.t("creations.judgedWrong")}</span></div>`;
+      } else if (c.type === "teach") {
+        div.innerHTML = `
+          <div class="history-date"><span>💬 ${window.I18n.t("creations.teachTag")}</span><span>${date}</span></div>
+          <div class="history-topic">${escapeHtml(c.content)}</div>
+          <div class="history-meta"><span>🧡 ${Math.round((c.quality || 0) * 100)}%</span></div>`;
+      } else {
+        return;
+      }
+      wrap.appendChild(div);
+    });
+  } catch (_) {
+    wrap.innerHTML = `<div class="history-empty">${window.I18n.t("creations.empty")}</div>`;
+  }
+}
 
 async function sendChat() {
   const input = $("#chat-input");
@@ -845,6 +999,25 @@ async function loadProgressHeader() {
     const conf = p.confidence_trend.length ? Math.round(p.confidence_trend[p.confidence_trend.length-1] * 100) : null;
     $("#status-confidence").textContent = conf === null ? "💪 --" : `💪 ${conf}%`;
   } catch {}
+  // V3.0 P1 规格 11.4：聊天页状态栏身份标签（数据源 /api/student/{sid} 的 identity）
+  try {
+    const s = await api(`/api/student/${studentId}`, null, "GET");
+    if (s && s.identity) renderIdentityChip(s.identity);
+  } catch {}
+}
+
+function renderIdentityChip(identity) {
+  const chip = $("#identity-chip");
+  if (!chip) return;
+  if (!identity || !identity.title) {
+    chip.classList.add("hidden");
+    return;
+  }
+  const badges = identity.badges || [];
+  const badgeText = badges.length ? " · " + badges.slice(0, 3).join(" ") : "";
+  const tpl = (window.I18n && window.I18n.t) ? window.I18n.t("identity.chip") : "🏅 {title}";
+  chip.textContent = tpl.replace("{title}", identity.title) + badgeText;
+  chip.classList.remove("hidden");
 }
 
 function updateConfidenceBar(v) {
@@ -863,6 +1036,7 @@ $all(".tab").forEach(tab => {
     if (currentView === "badges") { renderBadges(); renderCardsView(); if (window.AdventureView) window.AdventureView.load(); }
     if (currentView === "cognitive") renderCognitiveProfile();
     if (currentView === "pbl") { if (window.PBLView) window.PBLView.loadInto("view-pbl"); }
+    if (currentView === "creations") renderCreations();
   };
 });
 
@@ -1323,17 +1497,74 @@ let loggingOut = false;
 
 $("#btn-logout").onclick = async () => {
   if (loggingOut) return;
-  if (!confirm("要和小圆说再见吗？今天的对话会自动保存哦～")) return;
   loggingOut = true;
   try {
+    let farewell = null;
     if (studentId && sessionStartTime) {
-      await api("/api/session/end", { student_id: studentId });
+      farewell = await api("/api/session/end", { student_id: studentId });
+    }
+    // 收集告别内容：结尾悬念 + 数学趣闻 + 小圆故事线（I-11.5 / I-11.7）
+    const parts = [];
+    if (farewell) {
+      if (farewell.closing_hook) parts.push(farewell.closing_hook);
+      if (farewell.fun_fact) parts.push("🔎 小知识：" + farewell.fun_fact);
+      if (farewell.story_reveal) parts.push(farewell.story_reveal);
+      if (farewell.thinking_problem && farewell.thinking_problem.question) {
+        const tpTitle = (window.I18n && window.I18n.t)
+          ? window.I18n.t("thinking_daily.title")
+          : "🌙 今日思考题";
+        parts.push(
+          tpTitle + "：" + farewell.thinking_problem.question +
+          "\n（不着急，走路的时候说不定就突然想通了～）"
+        );
+      }
+    }
+    if (parts.length) {
+      await showFarewellModal(parts.join("\n\n"));
     }
   } catch (_) { /* 归档失败也不阻塞退出 */ }
+  finishLogout();
+};
+
+function finishLogout() {
   sessionStartTime = null;
   localStorage.removeItem("xy_student_id");
   location.reload();
-};
+}
+
+// 告别弹窗：展示小圆的结尾悬念/趣闻/故事线，用户确认后退出登录
+function showFarewellModal(text) {
+  return new Promise(resolve => {
+    const mask = document.createElement("div");
+    mask.style.cssText =
+      "position:fixed;inset:0;background:rgba(30,30,30,.5);z-index:9999;" +
+      "display:flex;align-items:center;justify-content:center;animation:comboFadeIn .25s ease;";
+    const box = document.createElement("div");
+    box.style.cssText =
+      "background:var(--card-bg,#fff);border-radius:18px;padding:26px 24px;" +
+      "max-width:430px;width:90%;box-shadow:0 12px 40px rgba(0,0,0,.28);text-align:center;";
+    const emoji = document.createElement("div");
+    emoji.textContent = "🐱";
+    emoji.style.cssText = "font-size:44px;margin-bottom:8px;";
+    const head = document.createElement("div");
+    head.textContent = "小圆姐姐";
+    head.style.cssText = "font-weight:600;font-size:16px;margin-bottom:14px;";
+    const body = document.createElement("div");
+    body.textContent = text;
+    body.style.cssText =
+      "font-size:15px;line-height:1.7;white-space:pre-line;margin-bottom:20px;";
+    const btn = document.createElement("button");
+    btn.textContent = "好，明天见～";
+    btn.className = "mode-btn-modal";
+    btn.style.cssText =
+      "background:linear-gradient(135deg,#8fc7a0,#5da377);color:#fff;border:none;" +
+      "border-radius:999px;padding:10px 30px;font-size:15px;cursor:pointer;";
+    btn.onclick = () => { mask.remove(); resolve(); };
+    box.append(emoji, head, body, btn);
+    mask.appendChild(box);
+    document.body.appendChild(mask);
+  });
+}
 
 window.addEventListener("beforeunload", () => {
   if (studentId && sessionStartTime && !loggingOut && navigator.sendBeacon) {

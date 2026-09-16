@@ -140,11 +140,22 @@ function showCardReveal(data) {
   if (!overlay) return;
   overlay.classList.remove("hidden");
   $("#card-drop-title").innerHTML = isNew ? "🎉 收集到新卡片！" : "重复卡片 → 星光 ⭐";
-  $("#card-drop-big").className = `big-card card-${rarity}`;
-  $("#card-drop-big").innerHTML = `
-    <div class="big-icon" style="font-size:52px">${isNew ? card.front_icon : "⭐"}</div>
-    <div class="big-name">${escapeHtml(card.name)}</div>
-    <div class="big-text">${isNew ? escapeHtml(card.front_text) : `+${data.starlight_gained || 0} 星光`}</div>`;
+  const big = $("#card-drop-big");
+  big.className = `big-card card-${rarity}`;
+  big.innerHTML = `
+    <div class="big-face big-face-front">
+      <div class="big-icon" style="font-size:52px">${isNew ? card.front_icon : "⭐"}</div>
+      <div class="big-name">${escapeHtml(card.name)}</div>
+      <div class="big-text">${isNew ? escapeHtml(card.front_text) : `+${data.starlight_gained || 0} 星光`}</div>
+    </div>
+    <div class="big-face big-face-back">
+      <div class="big-back-q">?</div>
+      <div class="big-back-hint">🎴</div>
+    </div>`;
+  // 先显示背面（.big-card 初始 rotateY(180deg)），600ms 后翻到正面
+  big.classList.remove("flipped");
+  void big.offsetWidth;
+  setTimeout(() => big.classList.add("flipped"), 600);
   $("#card-drop-info").innerHTML = isNew
     ? `<span class="gain">${CARD_RARITY_LABEL[rarity] || rarity}</span> · ${escapeHtml(card.back_text || "")}`
     : `第 ${(data.duplicate_count || 0) + 1} 张 · 已转化为 ${data.starlight_gained || 0} 星光（当前余额 ${data.starlight_total || 0}）`;
