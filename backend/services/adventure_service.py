@@ -139,6 +139,16 @@ def _grant_rewards(student: Student, level: dict) -> dict:
         student.badges.append(badge_id)
         badge_unlocked = badge_id
 
+    # 真·通关徽章（K.3）：boss 关且知识点掌握度达标才发放
+    if level["type"] == "boss":
+        node_id = level["knowledge_node"]
+        threshold = level["completion_condition"]["mastery_threshold"]
+        if _mastery_score(student.mastery.get(node_id)) >= threshold:
+            true_clear_id = f"🎖️ 真·通关:{node_id}"
+            if true_clear_id not in student.badges:
+                student.badges.append(true_clear_id)
+                badge_unlocked = true_clear_id
+
     return {
         "xp": xp,
         "card_dropped": card_dropped,

@@ -70,6 +70,7 @@ def generate_weekly_report(student: Student) -> dict:
         },
         "insights": insights,
         "suggestions": suggestions,
+        "skipped_topic_alerts": _skip_alerts(student),
     }
 
 
@@ -165,3 +166,17 @@ def _generate_suggestions(student: Student) -> list[str]:
         suggestions.append("尝试每天固定时间学习15分钟，连续学习会获得「不断链」徽章哦。")
 
     return suggestions[:3]
+
+
+def _skip_alerts(student: Student) -> list[str]:
+    """K.4：连续跳过提示（同一知识点跳过 ≥3 次，最多 3 条）。"""
+    alerts: list[str] = []
+    for tid, count in (student.skipped_topics or {}).items():
+        if count >= 3:
+            from backend.knowledge.syllabus import get_node
+            node = get_node(tid)
+            name = node.name if node else tid
+            alerts.append(f"「{name}」孩子连续跳过了，建议下次用项目/游戏方式引入")
+            if len(alerts) >= 3:
+                break
+    return alerts

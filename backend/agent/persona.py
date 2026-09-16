@@ -702,6 +702,43 @@ def pick_strange_phenomenon() -> str:
     return random.choice(STRANGE_PHENOMENA)
 
 
+# --- 时间信任承诺（K.4）：知识点价值说明话术库 ---
+VALUE_WHY_TEMPLATES: list[str] = [
+    "这个知识点能帮你搞定「生活中的计算」，学完我们就能去玩对应的趣味项目了",
+    "它是后面好多知识的「地基」，现在打牢了，后面学起来会越来越轻松",
+    "学会它，你遇到类似的题一眼就能看出思路，写作业能快好多",
+    "它就像游戏里的一件新装备，装上它，很多以前觉得难的题就变简单了",
+    "这个知识能和你喜欢的东西连起来，学完就能用在真实的小场景里",
+]
+
+
+def value_statement_for(topic_id: str, topic_name: str = "") -> str:
+    """为知识点生成一句价值说明（K.4 时间信任承诺）。
+
+    优先引用知识图谱节点自带的价值字段（value/why/motivation，若有），
+    否则从话术库随机抽取；返回带引导语的完整文案，供首次教学或价值质疑时注入。
+    """
+    import random
+
+    statement = ""
+    node = syllabus.get_node(topic_id)
+    if node is not None:
+        for attr in ("value", "why", "motivation"):
+            candidate = getattr(node, attr, None)
+            if candidate:
+                statement = str(candidate)
+                break
+    if not statement:
+        statement = random.choice(VALUE_WHY_TEMPLATES)
+    if topic_name:
+        statement = f"{topic_name}——{statement}"
+
+    return (
+        "📌 先说说为什么值得学：" + statement + "\n"
+        "（如果你觉得这个暂时用不上，也可以直接告诉我，我们可以换个方式或者先跳过）"
+    )
+
+
 def fun_fact_unlock(student) -> dict | None:
     """随机解锁 1 条未解锁的数学趣闻并存入 student.v3_meta.fun_facts_unlocked（可变奖励）。
 
