@@ -1,6 +1,6 @@
 # Xiaoyuan Tutor 🌸
 
-An AI math tutor that accompanies middle school students through warm, conversational guidance, helping children **build confidence** and develop **mathematical thinking skills**.
+An AI math tutor that accompanies K12 students (grades 0-12, up to college) through warm, conversational guidance, helping children **build confidence** and develop **mathematical thinking skills**.
 
 [中文版](./README.md) ｜ [Full Design Doc](./docs/设计方案.md)
 
