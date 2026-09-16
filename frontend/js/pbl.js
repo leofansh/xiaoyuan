@@ -159,6 +159,17 @@ window.PBLView = {
     pblCelebrate();
   },
 
+  /* 查询待处理的剧情选择点（规格 11.7），有则弹出剧情选择弹窗 */
+  async checkPendingChoice(projectId) {
+    const sid = getPblStudentId();
+    if (!sid || !projectId) return;
+    try {
+      const data = await pblFetch(`/api/pbl/projects/${projectId}/pending-choice?student_id=${encodeURIComponent(sid)}`, null, "GET");
+      const pending = data && data.pending_choice;
+      if (pending) showChoiceModal(projectId, pending);
+    } catch (e) { /* 静默忽略：选择为非强制彩蛋，不影响主线 */ }
+  },
+
   /* 集成者塞入模拟器渲染函数 renderFn(containerEl, simulatorConfig) */
   setSimulator(renderFn) {
     this._simulatorRender = typeof renderFn === "function" ? renderFn : null;
@@ -533,6 +544,69 @@ function renderRewardItem(r) {
 }
 
 /* ================================================================
+   剧情选择弹窗（规格 11.7）
+   ================================================================ */
+
+let _choiceProjectId = null;
+
+function ensureChoiceOverlay() {
+  let overlay = document.getElementById("pbl-choice-overlay");
+  if (overlay) return overlay;
+  overlay = document.createElement("div");
+  overlay.id = "pbl-choice-overlay";
+  overlay.className = "pbl-choice-overlay hidden";
+  overlay.innerHTML = `
+    <div class="pbl-choice-card">
+      <div class="pbl-choice-title">🧭 剧情选择</div>
+      <div class="pbl-choice-prompt"></div>
+      <div class="pbl-choice-options"></div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener("click", (e) => {
+    if (e.target === e.currentTarget) overlay.classList.add("hidden");
+  });
+  return overlay;
+}
+
+function closeChoice() {
+  const overlay = document.getElementById("pbl-choice-overlay");
+  if (overlay) overlay.classList.add("hidden");
+}
+
+function showChoiceModal(projectId, pending) {
+  if (!pending || !pending.options || !pending.options.length) return;
+  const overlay = ensureChoiceOverlay();
+  _choiceProjectId = projectId;
+  overlay.querySelector(".pbl-choice-prompt").textContent = pending.prompt || "";
+  overlay.querySelector(".pbl-choice-options").innerHTML = (pending.options || []).map(opt =>
+    `<button class="pbl-choice-option" data-choice-id="${escapeHtmlSafe(pending.choice_id)}" data-option-id="${escapeHtmlSafe(opt.id)}">
+      <span class="pbl-choice-label">${escapeHtmlSafe(opt.label)}</span>
+      ${opt.hint ? `<span class="pbl-choice-hint">${escapeHtmlSafe(opt.hint)}</span>` : ""}
+    </button>`).join("");
+  overlay.classList.remove("hidden");
+}
+
+async function answerChoice(choiceId, optionId) {
+  const projectId = _choiceProjectId || window.PBLView.currentProjectId;
+  const sid = getPblStudentId();
+  if (!sid || !projectId) return;
+  try {
+    const res = await pblFetch(`/api/pbl/projects/${projectId}/choice`, { choice_id: choiceId, option_id: optionId, student_id: sid });
+    if (res && res.success === false) {
+      pblToast(res.message || "选择失败，再试一次？");
+      return;
+    }
+    closeChoice();
+    if (res && res.next_intro) {
+      pblToast(String(res.next_intro).slice(0, 60));
+    }
+    window.PBLView.loadDetail(projectId);
+  } catch (e) {
+    pblToast("选择提交失败：" + (e.message || "网络开小差了"));
+  }
+}
+
+/* ================================================================
    事件绑定
    ================================================================ */
 
@@ -567,11 +641,20 @@ function bindPblEvents() {
         closeComplete();
         // 下一关：刷新详情（关卡列表会解锁下一关）
         window.PBLView.loadDetail(window.PBLView.currentProjectId);
+        window.PBLView.checkPendingChoice(window.PBLView.currentProjectId);
         break;
       case "close-complete":
         closeComplete();
+        window.PBLView.checkPendingChoice(window.PBLView.currentProjectId);
         break;
     }
+  });
+
+  // 剧情选择弹窗：选项点击
+  document.addEventListener("click", (e) => {
+    const opt = e.target.closest("[data-choice-id]");
+    if (!opt) return;
+    answerChoice(opt.dataset.choiceId, opt.dataset.optionId);
   });
 
   // 输入框回车发送（关卡对话区）

@@ -40,12 +40,26 @@ function showComboEffect(data) {
   if (data.xp_bonus) toast(`🎯 连击奖励 +${data.xp_bonus} XP！`, 3000);
 }
 
+/* ---------------- 答错归零鼓励提示 ---------------- */
+function showComboResetEncouragement(message) {
+  if (!message) return;
+  const el = document.createElement("div");
+  el.className = "combo-reset-toast";
+  el.textContent = message;
+  document.body.appendChild(el);
+  setTimeout(() => el.classList.add("fade-out"), 1200);
+  setTimeout(() => el.remove(), 1500);
+}
+
 /* ---------------- SSE / 初始状态 ---------------- */
 function handleComboSSE(data) {
   if (!data) return;
   comboState.current = data.current != null ? data.current : comboState.current;
   renderComboIndicator(comboState.current);
   showComboEffect(data);
+  if (data.current === 0 && data.message) {
+    showComboResetEncouragement(data.message);
+  }
 }
 
 async function loadComboState() {

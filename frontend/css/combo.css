@@ -71,3 +71,28 @@
   80% { opacity: 1; }
   100% { opacity: 0; }
 }
+
+/* ---------------- 答错归零鼓励提示（规格 5.3/5.8：温和鼓励，短暂淡入淡出） ---------------- */
+.combo-reset-toast {
+  position: fixed;
+  bottom: 120px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 160;
+  max-width: 80vw;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #7a5a3a;
+  background: #fff6ec;
+  border: 1px solid #ffd9b3;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(255, 153, 102, .25);
+  pointer-events: none;
+  animation: combo-reset-in .3s ease;
+}
+.combo-reset-toast.fade-out { opacity: 0; transition: opacity .3s ease; }
+@keyframes combo-reset-in {
+  0% { opacity: 0; transform: translateX(-50%) translateY(8px); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
