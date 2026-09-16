@@ -438,6 +438,26 @@ async def process_message(
     if sess.state == "BLIND_SPOT" and user_message and "不知道" not in user_message[:6]:
         assessment.record_blind_spot(student, user_message)
 
+    # V3.0 K.2：认知卸载检测（纯规则，纯学习模式下关闭，规格 K.2）
+    offload_signals: list = []
+    if not pure_mode:
+        try:
+            from backend.services.offload_detector import detect_offload_signals
+            _recent_user = [m["content"] for m in sess.history[-4:] if m.get("role") == "user"]
+            _recent_user.append(user_message or "")
+            offload_signals = detect_offload_signals(student, user_message, _recent_user)
+            for _sig in offload_signals:
+                student.offload_events.append({
+                    "timestamp": datetime.now().isoformat(timespec="seconds"),
+                    "signal": _sig.signal,
+                    "confidence": _sig.confidence,
+                    "detail": _sig.detail,
+                    "student_quote": _sig.student_quote[:100],
+                    "resolved": False,
+                })
+        except ImportError:
+            pass
+
     # V3.0 P3 模块G：共创模式——已进入共创流程时走解释性状态机（不进 LLM 教学循环）
     from backend.pbl.co_creation import advance_co_creation, is_co_creation_state, step_from_state
     if is_co_creation_state(sess.state):
@@ -511,6 +531,15 @@ async def process_message(
     system_prompt = persona.build_system_prompt(student)
 
     extras: list[str] = []
+    # V3.0 K.2：认知卸载干预话术注入（恢复独立思考，绝不直接给答案）
+    if offload_signals:
+        from backend.services.offload_detector import INTERVENTION_PHRASES
+        for _sig in offload_signals:
+            _phrases = INTERVENTION_PHRASES.get(_sig.signal, [])
+            _picked = _phrases[0] if _phrases else ""
+            extras.append(
+                f"[系统提示：检测到认知卸载信号（{_sig.signal}）。请立即用以下方式干预，恢复孩子的独立思考，绝不直接给答案：\n{_picked}]"
+            )
     if external_extra:
         extras.append(external_extra)
 
@@ -626,6 +655,38 @@ async def process_message(
     )
     if _strategy:
         extras.append(f"[教学策略指令]\n{strategy_instruction(_strategy)}")
+
+    # K.4 时间信任承诺：新知识点首次教学注入价值说明
+    if (
+        not pure_mode
+        and sess.topic_id
+        and sess.state not in ("MODE_SELECT", "BLIND_SPOT")
+        and student.mastery.get(sess.topic_id) is None
+    ):
+        from backend.agent.persona import value_statement_for
+
+        extras.append(
+            "[系统提示：本知识点首次教学，请先输出价值说明：\n"
+            + value_statement_for(sess.topic_id)
+            + "\n然后自然开始教学（若孩子表示不感兴趣，提供换方式或跳过选项）]"
+        )
+
+    # K.4 时间信任承诺：价值质疑 / 跳过追踪
+    if not pure_mode and sess.topic_id and user_message:
+        if any(k in user_message for k in ["为什么要学", "为啥要学", "为什么学这个"]):
+            extras.append(
+                "[系统提示：孩子询问本知识点价值。请先用一句话说明为什么值得学（从孩子关心的角度），若仍不接受，提供「换个方式」或「先跳过」选项，绝不强迫]"
+            )
+        elif any(
+            k in user_message
+            for k in ["跳过", "不想学这个", "换一个吧", "没意思", "不感兴趣", "学这个干嘛", "学这个有啥用", "有啥用"]
+        ):
+            skip_map = getattr(student, "skipped_topics", None) or {}
+            student.skipped_topics = skip_map
+            skip_map[sess.topic_id] = int(skip_map.get(sess.topic_id, 0)) + 1
+            extras.append(
+                "[系统提示：孩子想跳过本知识点。请：①若价值说明还没输出，先简短补一句；②仍不接受时，温柔提供「换个方式学」或「先跳过」，绝不强迫、不让她有愧疚感；③她选择跳过就自然接受，下次可换项目方式引入]"
+            )
 
     extra_instruction = "\n".join(extras)
     if extra_instruction:

@@ -214,6 +214,10 @@ class Student(BaseModel):
     pbl_projects: dict = Field(default_factory=dict)   # PBL：{active_project_id, projects: {pid: 进度}} 见规格 7.2.1
     custom_projects: list[dict[str, Any]] = Field(default_factory=list)  # P3 共创项目（P2 预留）
 
+    # ---- V3.0 K.2：防认知卸载护栏 ----
+    offload_events: list[dict[str, Any]] = Field(default_factory=list)  # 认知卸载事件
+    skipped_topics: dict[str, int] = Field(default_factory=dict)        # 跳过计数 {topic_id: n}
+
     # ---- V3.0 P2：故事与叙事（I-11.7）----
     v3_meta: dict = Field(default_factory=lambda: {   # V3 元数据：剧情进度/小圆秘密解锁等
         "story_arc": {"chapter_progress": {}, "revealed_count": 0},
@@ -317,6 +321,9 @@ class Badge:
     INSIGHT_GIANT_KILLER = "🗡️ 难题杀手"
     INSIGHT_PROBLEM_MASTER = "📚 思考题大师"
 
+    # ---- K.3：掌握优于完成 ----
+    TRUE_CLEAR = "🎖️ 真·通关"
+
     ALL: dict[str, dict[str, str]] = {
         BLIND_HUNTER: {"desc": "第一次自己说出哪里没学踏实", "icon": "🔍"},
         DERIVE_BRAVE: {"desc": "第一次独立推导出核心公式", "icon": "🧗"},
@@ -344,4 +351,5 @@ class Badge:
         INSIGHT_CHALLENGER: {"desc": "完成第一道挑战题", "icon": "⚔️"},
         INSIGHT_GIANT_KILLER: {"desc": "完成10道挑战题", "icon": "🗡️"},
         INSIGHT_PROBLEM_MASTER: {"desc": "想通5道每日思考题", "icon": "📚"},
+        TRUE_CLEAR: {"desc": "关卡知识点掌握度全部≥0.7 后真正通关", "icon": "🎖️"},
     }
