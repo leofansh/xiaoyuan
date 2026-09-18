@@ -47,6 +47,9 @@ CHAIN_EQ = re.compile(
     + r'(?!\d)'
 )
 
+# V3.0 模块 L.8：VIS 可视化标记块（数轴/线段图）——校验时整体跳过，防止误改其内部 JSON
+_VIS_BLOCK = re.compile(r'<<<XIAOYUAN_VIS>>>[\s\S]*?<<<END_VIS>>>')
+
 
 def _eval_expr(expr_str: str) -> float | None:
     """安全求值纯算术表达式，失败返回 None。"""
@@ -81,6 +84,15 @@ def _solve_equation(lhs: str, rhs: str) -> float | None:
 def verify_and_fix(text: str) -> tuple[str, list[dict]]:
     """验证文本中的数学等式，返回(修正后文本, 修正记录列表)。"""
     fixes = []
+
+    # V3.0 模块 L.8：先抽出 VIS 可视化标记块，验证时跳过，防止误改其内部 JSON
+    vis_blocks: list[str] = []
+
+    def _protect_vis(match: re.Match) -> str:
+        vis_blocks.append(match.group(0))
+        return f"\x00VIS{len(vis_blocks) - 1}\x00"
+
+    text = _VIS_BLOCK.sub(_protect_vis, text)
 
     def _try_fix(expr_str: str, claimed: str, full_match: str) -> str:
         """尝试验证一个纯算术等式，返回修正后的完整匹配或原匹配。"""
@@ -152,6 +164,10 @@ def verify_and_fix(text: str) -> tuple[str, list[dict]]:
         return match.group(0)
 
     text = CHAIN_EQ.sub(_try_chain, text)
+
+    # V3.0 模块 L.8：还原 VIS 可视化标记块（占位符 \x00VISn\x00 不可能被上面正则匹配）
+    for i, blk in enumerate(vis_blocks):
+        text = text.replace(f"\x00VIS{i}\x00", blk)
 
     if fixes:
         logger.warning("计算验证修正了%d处: %s", len(fixes), fixes)

@@ -88,3 +88,186 @@ def apply_forgetting(
     record.score = round(new_score, 2)
     record.confidence = round(new_conf, 2)
     return record
+
+
+# ============ V3.0 模块 L.4.1：延迟验证（Delayed Testing） ============
+# 理论依据：即时自测会高估掌握（工作记忆仍"热着"），24~48 小时后再测才反映真实掌握度。
+# 实现：验证题 = 复习题，复用间隔复习调度器（review_schedules），仅打 delayed_check 标记。
+
+
+def schedule_delayed_check(
+    student,
+    topic_id: str,
+    topic_name: str = "",
+    claimed_at: str | None = None,
+) -> bool:
+    """费曼检查通过时登记次日延迟验证任务（L.4.1）。
+
+    在 student.review_schedules 中创建/更新一条延迟验证计划：
+    - next_review = 明天（次日开场 30 秒验证）
+    - delayed_check = True（标识验证题 = 复习题）
+
+    Args:
+        student: 学生档案
+        topic_id: 通过费曼检查的知识点
+        topic_name: 知识点名称（回退到 syllabus）
+        claimed_at: 首次声称掌握时间（ISO；缺省为当前时间）
+
+    Returns:
+        是否成功登记。
+    """
+    from datetime import datetime, timedelta
+
+    from backend.knowledge import syllabus
+
+    node = syllabus.get_node(topic_id)
+    if not node:
+        return False
+    name = topic_name or node.name
+    claimed = claimed_at or datetime.now().isoformat(timespec="seconds")
+    tomorrow = (datetime.now().date() + timedelta(days=1)).isoformat()
+
+    existing = next(
+        (rs for rs in student.review_schedules if rs.topic_id == topic_id),
+        None,
+    )
+    if existing:
+        # 已有计划：升级为延迟验证，覆盖为明天（立即验证比原间隔优先）
+        existing.delayed_check = True
+        existing.claimed_at = claimed
+        existing.next_review = tomorrow
+        existing.interval_days = 1
+        return True
+
+    from backend.models.student import ReviewSchedule
+
+    student.review_schedules.append(
+        ReviewSchedule(
+            topic_id=topic_id,
+            topic_name=name,
+            next_review=tomorrow,
+            interval_days=1,
+            review_count=0,
+            last_reviewed="",
+            mastery_at_schedule=student.mastery_score(topic_id, 0.0),
+            delayed_check=True,
+            claimed_at=claimed,
+        )
+    )
+    return True
+
+
+def get_due_delayed_checks(student):
+    """取今天到期的延迟验证任务（L.4.1，会话开场调用）。
+
+    延迟验证 = 标记了 delayed_check 且 next_review 到期的复习计划。
+    完成后标记转为普通复习（record_delayed_check_result 内处理）。
+
+    Returns:
+        到期延迟验证任务列表（ReviewSchedule）。
+    """
+    from datetime import datetime
+
+    today = datetime.now().date().isoformat()
+    return [
+        rs for rs in student.review_schedules
+        if rs.delayed_check and rs.next_review and rs.next_review <= today
+    ]
+
+
+def record_delayed_check_result(student, topic_id: str, success: bool) -> dict:
+    """延迟验证结果结算（L.4.1）。
+
+    - 通过：掌握度确认更新（作为一次成功观测），转普通复习节奏（间隔翻倍）
+    - 失败：掌握度回退 + 记录 false_mastery 事件 + 换讲法重新讲解
+
+    Returns:
+        结果描述 dict：{success, rolled_back, prev_score, new_score, false_mastery_event}
+    """
+    from datetime import datetime
+
+    from backend.models.student import TeachingInsight
+
+    rs = next(
+        (r for r in student.review_schedules if r.topic_id == topic_id),
+        None,
+    )
+    claimed_at = rs.claimed_at if rs else ""
+    prev_score = student.mastery_score(topic_id, 0.0)
+    today = datetime.now().isoformat(timespec="seconds")
+
+    result: dict = {
+        "success": success,
+        "rolled_back": False,
+        "prev_score": prev_score,
+        "new_score": prev_score,
+        "false_mastery_event": None,
+    }
+
+    if success:
+        # 通过：作为一次独立成功观测更新掌握度（确认"真掌握"）
+        rec = student.mastery.get(topic_id)
+        from backend.models.student import MasteryRecord
+
+        rec = update_mastery(
+            rec or MasteryRecord(),
+            observed_correct=True,
+            llm_score=None,
+            today=today[:10],
+        )
+        student.mastery[topic_id] = rec
+        if rs:
+            # 转普通复习：清标记 + 按复习成功推进（间隔翻倍）
+            rs.delayed_check = False
+            rs.claimed_at = ""
+            from backend.services.repetition import record_review
+
+            record_review(student, topic_id, True)
+        result["new_score"] = rec.score
+    else:
+        # 失败：掌握度回退 + false_mastery 事件 + 换讲法引导
+        rec = student.mastery.get(topic_id)
+        if rec:
+            rec.score = round(max(0.0, prev_score * 0.6), 2)
+            rec.confidence = round(max(0.0, (rec.confidence or 0.0) * 0.7), 2)
+            rec.attempts_total += 1
+            rec.last_interaction = today[:10]
+            result["rolled_back"] = True
+            result["new_score"] = rec.score
+        if rs:
+            rs.delayed_check = False
+            rs.claimed_at = ""
+
+        event = {
+            "date": today[:10],
+            "topic_id": topic_id,
+            "topic_name": rs.topic_name if rs else topic_id,
+            "claimed_at": claimed_at,
+            "verified_at": today,
+            "result": "failed",
+            "prev_score": prev_score,
+            "new_score": result["new_score"],
+            "action": "rollback + 换一种讲法重新讲解",
+        }
+        student.false_mastery_events.append(event)
+        # 保持日志 ≤50 条
+        if len(student.false_mastery_events) > 50:
+            student.false_mastery_events = student.false_mastery_events[-50:]
+        result["false_mastery_event"] = event
+
+        # 教学日志特别记录（规格 L.9：false_mastery 事件类型）
+        student.teaching_journal.append(TeachingInsight(
+            date=today[:10],
+            category="false_mastery",
+            insight=(
+                f"假性掌握：昨天声称掌握「{rs.topic_name if rs else topic_id}」，"
+                f"次日延迟验证未通过，掌握度已回退（{prev_score:.2f}→{result['new_score']:.2f}）"
+            ),
+            what_worked="",
+            what_failed="口头确认即更新掌握度，未经延迟验证校准",
+            student_style="即时自测会高估掌握，需要间隔验证",
+        ))
+        if len(student.teaching_journal) > 50:
+            student.teaching_journal = student.teaching_journal[-50:]
+
+    return result

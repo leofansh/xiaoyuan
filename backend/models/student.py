@@ -55,6 +55,19 @@ class SessionState(BaseModel):
     challenge_state: str = ""           # "" | invited | active | solved | declined
     challenge_problem_id: str = ""      # 当前挑战题 ID（CHALLENGE_BANK）
     challenge_presented: bool = False   # 挑战题文本是否已由小圆发出
+    # ---- V3.0 模块 L：双向有效交流（UNDERSTAND_CONFIRM 状态）----
+    understand_confirm_from: str = ""   # 进入确认态前的原状态（确认完成后恢复）
+    feynman_topic_id: str = ""          # 待费曼复述的知识点（L.4）
+    feynman_topic_name: str = ""        # 待费曼复述的知识点名称
+    diagnostic_topic_id: str = ""       # 台阶式诊断的知识点（L.3）
+    delayed_check_topic_id: str = ""    # 当前正在延迟验证的知识点（L.4.1）
+    last_cognitive_load: str = ""       # 上一轮 LLM 评估的认知负荷（L.7 讲解粒度控制）
+    # 信号防重与事件记录（模块 L）
+    last_understand_signal: str = ""    # 上一轮命中的理解信号（防死循环短路）
+    last_understand_turn: int = 0       # 上一轮命中信号时的 signal_count
+    understand_signal_count: int = 0    # 累计命中信号次数（单调递增，防重比较用）
+    current_understand_signal: str = ""  # 本轮命中的理解信号（misunderstanding 事件用）
+    understand_pending_instruction: str = ""  # 确认流程结束后待注入下轮 LLM 的指令（如"换讲法"）
 
 
 class SessionSummary(BaseModel):
@@ -132,6 +145,9 @@ class ReviewSchedule(BaseModel):
     review_count: int = 0       # 已复习次数
     last_reviewed: str = ""     # 上次复习日期 ISO
     mastery_at_schedule: float = 0.0  # 调度时的掌握度
+    # ---- V3.0 模块 L.4.1：延迟验证标记（验证题 = 复习题，复用同一调度器）----
+    delayed_check: bool = False     # 是否来自费曼检查登记的延迟验证
+    claimed_at: str = ""            # 首次声称掌握的时间（false_mastery 事件用）
 
 
 class TeachingInsight(BaseModel):
@@ -218,6 +234,11 @@ class Student(BaseModel):
     offload_events: list[dict[str, Any]] = Field(default_factory=list)  # 认知卸载事件
     skipped_topics: dict[str, int] = Field(default_factory=dict)        # 跳过计数 {topic_id: n}
 
+    # ---- V3.0 模块 L：双向有效交流 ----
+    language_level: int = 2          # 学段语言层级 1~4（0~3/4~6/7~9/10~12 年级，L.5 自动推导）
+    misunderstanding_events: list[dict[str, Any]] = Field(default_factory=list)  # 假性理解/消解记录（L.4）
+    false_mastery_events: list[dict[str, Any]] = Field(default_factory=list)    # 延迟验证失败记录（L.4.1）
+
     # ---- V3.0 P2：故事与叙事（I-11.7）----
     v3_meta: dict = Field(default_factory=lambda: {   # V3 元数据：剧情进度/小圆秘密解锁等
         "story_arc": {"chapter_progress": {}, "revealed_count": 0},
@@ -253,6 +274,31 @@ class Student(BaseModel):
         """取某知识点置信度（B1）。"""
         rec = self.mastery.get(topic_id)
         return rec.confidence if rec else default
+
+    def derive_language_level(self) -> int:
+        """推导学段语言层级（L.5）：按年级分四档，认知画像低时降一级。
+
+        规则：0~3 年级 → 1；4~6 年级 → 2；7~9 年级 → 3；10~12 年级 → 4。
+        认知画像为低工作记忆或低抽象思维时降一级（低年级不再降）。
+        """
+        grade = int(self.grade or 0)
+        if grade <= 3:
+            level = 1
+        elif grade <= 6:
+            level = 2
+        elif grade <= 9:
+            level = 3
+        else:
+            level = 4
+        cp = self.cognitive_profile
+        if level > 1 and (cp.working_memory_capacity == "low" or cp.abstract_thinking < 0.35):
+            level -= 1
+        return level
+
+    def ensure_language_level(self) -> int:
+        """确保 language_level 与年级/认知画像一致（会话开始时刷新）。"""
+        self.language_level = self.derive_language_level()
+        return self.language_level
 
     def today_iso(self) -> str:
         return date.today().isoformat()

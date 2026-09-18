@@ -28,6 +28,9 @@ def start_session(student: Student, mood: str) -> dict:
     from backend.agent.cognitive_assessment import apply_cognitive_decay
     apply_cognitive_decay(student)
 
+    # V3.0 模块 L.5：刷新学段语言层级（按年级 + 认知画像推导）
+    student.ensure_language_level()
+
     sess = student.current_session
     sess.state = "MODE_SELECT"
     sess.started_at = datetime.now().isoformat(timespec="seconds")
@@ -111,12 +114,34 @@ def start_session(student: Student, mood: str) -> dict:
             except (ValueError, KeyError, TypeError):
                 pass
 
+    # V3.0 模块 L.4.1：延迟验证开场（昨天费曼检查通过的知识点，今天 30 秒热身验证）
+    # 复用间隔复习调度器：验证题 = 复习题。有到期任务时优先呈现（先于复习提示）。
+    if not pure_mode:
+        try:
+            from backend.services.mastery_tracker import get_due_delayed_checks
+            from backend.services.repetition import generate_retrieval_question
+            _due_dc = get_due_delayed_checks(student)
+            if _due_dc:
+                _rc = _due_dc[0]
+                _q = generate_retrieval_question(student, _rc.topic_id)
+                if _q:
+                    sess.delayed_check_topic_id = _rc.topic_id
+                    opening += (
+                        f"\n\n⏱️ 昨天你说「{_rc.topic_name}」你懂了，"
+                        f"今天我们 30 秒热个身——{_q}\n"
+                        "（不用有压力，试试就好～）"
+                    )
+        except ImportError:
+            pass
+
     return {
         "opening": opening,
         "mode_suggestion": suggestion,
         "streak": student.streak_chain,
         "due_reviews": [{"topic_id": rs.topic_id, "topic_name": rs.topic_name} for rs in due_reviews],
         "review_hint": review_hint,
+        # L.4.1：标记本次开场是否带延迟验证（前端可据此弱化复习提示）
+        "delayed_check": bool(sess.delayed_check_topic_id),
     }
 
 
@@ -286,6 +311,7 @@ def _settle_challenge_success(student: Student, *, independent_success: bool) ->
             or not sess.challenge_presented
             or sess.challenge_state not in ("invited", "active")):
         return []
+
     from backend.knowledge.cards import drop_card, ensure_cards
     from backend.services.pet import add_xp, ensure_pet
 
@@ -336,6 +362,172 @@ def _settle_challenge_success(student: Student, *, independent_success: bool) ->
         "card_dropped": _drop_payload(card_drop) if card_drop.get("success") else None,
         "badge_unlocked": badge_payload,
     }]
+
+
+# ============ V3.0 模块 L：双向有效交流（规格 L.2/L.3/L.4/L.7） ============
+# 可触发费曼检查 / 台阶诊断的"教学节点"集合（规格 L.4/L.3）
+TEACHING_STATES = frozenset({
+    "CORE_DERIVE", "EXAMPLE_CHECK", "OPTIONAL_VARIANT", "QUICK_REVIEW",
+    "FIX_ONE_ERROR", "WEEKEND_CLEAR", "ANALOGY_EXPLANATION", "VISUALIZATION",
+    "ERROR_REVIEW", "ERROR_ROOT_CAUSE", "BREAK_SUGGESTION", "THINKING_TRAINING",
+})
+
+
+def _record_misunderstanding(
+    student: Student, *, signal: str, detail: str, quote: str,
+    resolution: str, resolved: bool, topic_id: str = "",
+) -> None:
+    """记录假性理解 / 理解纠偏事件（规格 L.4，上限 50 条）。"""
+    student.misunderstanding_events.append({
+        "date": datetime.now().isoformat(timespec="seconds"),
+        "signal": signal,
+        "detail": detail,
+        "quote": quote[:100],
+        "resolution": resolution,
+        "resolved": resolved,
+        "topic_id": topic_id,
+    })
+    if len(student.misunderstanding_events) > 50:
+        student.misunderstanding_events = student.misunderstanding_events[-50:]
+
+
+def _build_understand_short_reply(student: Student, sig) -> str:
+    """根据理解信号构建短路回复（不进入 LLM）。
+
+    Returns:
+        非空字符串 → 直接输出并 return；空串 → 信号由 LLM 对症指令处理（extras 注入）。
+    """
+    import random as _rnd
+
+    from backend.knowledge import syllabus as _syl
+    from backend.services.understand_detector import (
+        FEYNMAN_OPENERS, build_step_diagnostic, pick_confirm_phrase,
+    )
+
+    sess = student.current_session
+    s = sig.signal
+
+    # 假性理解 "知道了/嗯/哦" → 费曼检查（仅教学节点 + 有知识点 + 上条助手消息够长）
+    if s == "fake_understand":
+        if sess.topic_id and sess.state in TEACHING_STATES:
+            _last = next(
+                (m["content"] for m in reversed(sess.history) if m.get("role") == "assistant"),
+                "",
+            ) or ""
+            if len(_last) >= 12:
+                _node = _syl.get_node(sess.topic_id)
+                sess.understand_confirm_from = sess.state
+                sess.feynman_topic_id = sess.topic_id
+                sess.feynman_topic_name = _node.name if _node else sess.topic_id
+                sess.state = "UNDERSTAND_CONFIRM"
+                return _rnd.choice(FEYNMAN_OPENERS)
+        return ""  # 不在教学节点/无知识点 → LLM 自然应对
+
+    # 元认知不足 "我就是不会" → 台阶式诊断（需节点配置 diagnostic_steps）
+    if s == "metacognition_gap":
+        _node = _syl.get_node(sess.topic_id) if sess.topic_id else None
+        _steps = _syl.get_diagnostic_steps(_node) if _node else []
+        if _steps:
+            sess.understand_confirm_from = sess.state
+            sess.diagnostic_topic_id = sess.topic_id
+            sess.state = "UNDERSTAND_CONFIRM"
+            return build_step_diagnostic(_node.name, _steps)
+        return ""
+
+    # "我不会" / "看不懂" → 确认提问（直接短路，不改状态，规格 L.2）
+    if s in ("cant_do", "text_confusion"):
+        return pick_confirm_phrase(s)
+
+    # claimed_understand / method_conflict / emotional_fatigue / calc_wrong → 不走短路
+    return ""
+
+
+def _handle_understand_confirm_answer(student: Student, user_message: str) -> str | None:
+    """处理孩子在 UNDERSTAND_CONFIRM 状态下的回答（费曼复述 / 台阶选择）。
+
+    Returns:
+        非空字符串 → 本轮直接输出该话术（费曼通过/失败、重示台阶）
+        None → 已恢复原教学状态并设置 understand_pending_instruction，继续走 LLM 流程
+    """
+    import random as _rnd
+    import re as _re
+
+    from backend.knowledge import syllabus as _syl
+    from backend.services.mastery_tracker import schedule_delayed_check
+    from backend.services.understand_detector import (
+        FEYNMAN_FAIL_GUIDE, FEYNMAN_PASS_PRAISE, build_step_diagnostic,
+    )
+
+    sess = student.current_session
+    msg = (user_message or "").strip()
+
+    # —— 费曼复述 ——
+    if sess.feynman_topic_id:
+        topic_id = sess.feynman_topic_id
+        topic_name = sess.feynman_topic_name or topic_id
+        restored = sess.understand_confirm_from or "CORE_DERIVE"
+        # 视为通过：实质复述（>=4 字且不含失败词）
+        fail_words = ("忘了", "不知道", "不会说", "记不清", "说不出来", "不记得")
+        passed = len(msg) >= 4 and not any(w in msg for w in fail_words)
+        # 复位费曼检查临时字段
+        sess.feynman_topic_id = ""
+        sess.feynman_topic_name = ""
+        sess.understand_confirm_from = ""
+        sess.state = restored
+        if passed:
+            # L.4：费曼通过 → 表扬 + 登记次日延迟验证 + 记录事件（已消解）
+            schedule_delayed_check(student, topic_id, topic_name)
+            _record_misunderstanding(
+                student, signal="fake_understand", detail="费曼复述通过",
+                quote=msg, resolution="feynman_pass", resolved=True, topic_id=topic_id,
+            )
+            return _rnd.choice(FEYNMAN_PASS_PRAISE)
+        # L.4：费曼失败 → 鼓励 + 记录未消解事件 + 设换讲法指令（下轮 LLM 执行）
+        _record_misunderstanding(
+            student, signal="fake_understand", detail="费曼复述失败",
+            quote=msg, resolution="feynman_fail", resolved=False, topic_id=topic_id,
+        )
+        sess.understand_pending_instruction = (
+            f"[系统提示：孩子刚在费曼检查中复述失败（假性理解）。"
+            f"请换一种与刚才完全不同的讲法/比喻重新讲解「{topic_name}」，"
+            f"讲完再请她用一句话复述]"
+        )
+        return _rnd.choice(FEYNMAN_FAIL_GUIDE)
+
+    # —— 台阶式诊断（选第 N 步 / 觉得都会 / 其他） ——
+    if sess.diagnostic_topic_id:
+        topic_id = sess.diagnostic_topic_id
+        node = _syl.get_node(topic_id)
+        steps = _syl.get_diagnostic_steps(node) if node else []
+        topic_name = node.name if node else topic_id
+        restored = sess.understand_confirm_from or "CORE_DERIVE"
+        m = _re.search(r"(\d+)", msg)
+        step_no = int(m.group(1)) if m else 0
+        sess.diagnostic_topic_id = ""
+        sess.understand_confirm_from = ""
+        sess.state = restored
+        if 1 <= step_no <= len(steps):
+            # 选定了卡壳台阶 → 设指令让 LLM 只讲这一层 → 走 LLM 流程
+            step = steps[step_no - 1]
+            sess.understand_pending_instruction = (
+                f"[系统提示：孩子自报卡在「{topic_name}」的台阶{step['step']}「{step['name']}」。"
+                f"本轮请只用最基础直觉讲解这一步（拆到最小可理解单位），"
+                f"确认她懂了再继续下一层。{step.get('check_question', '')}]"
+            )
+            return None
+        if any(w in msg for w in ("都会", "都行", "都懂", "都可以", "差不多")):
+            sess.understand_pending_instruction = (
+                f"[系统提示：孩子觉得「{topic_name}」都会但实际掌握度未达标。"
+                f"请从台阶1开始快速逐层过一遍，每层用一道小练习确认，找出真正薄弱处]"
+            )
+            return None
+        # 无法解析 → 重新展示台阶（保持 UNDERSTAND_CONFIRM）
+        sess.diagnostic_topic_id = topic_id
+        sess.understand_confirm_from = sess.state
+        sess.state = "UNDERSTAND_CONFIRM"
+        return build_step_diagnostic(topic_name, steps)
+
+    return None
 
 
 async def process_message(
@@ -434,6 +626,32 @@ async def process_message(
         }
         return
 
+    # V3.0 模块 L：UNDER_CONFIRM 状态——费曼复述 / 台阶选择答语处理（纯规则短路）
+    _uc_resumed_llm = False  # 本回答已由确认流程消费（如"选第N步"），本轮不再做信号检测
+    if not pure_mode and sess.state == "UNDER_CONFIRM":
+        _uc_reply = _handle_understand_confirm_answer(student, user_message)
+        if _uc_reply:
+            sess.history.append({"role": "user", "content": user_message})
+            sess.history.append({"role": "assistant", "content": _uc_reply})
+            if len(sess.history) > MAX_HISTORY_MESSAGES * 2:
+                sess.history = sess.history[-MAX_HISTORY_MESSAGES * 2 :]
+            sess.turn_count += 1
+            storage.save(student)
+            yield {"type": "text", "content": _uc_reply}
+            yield {
+                "type": "eval",
+                "state": student.current_session.state,
+                "badges": [],
+                "progress": None,
+                "emotion": None,
+                "metacognition": "none",
+                "anxiety": "low",
+            }
+            return
+        # _uc_reply 为 None：台阶选择已解析为 understand_pending_instruction，
+        # 原始教学状态已恢复，继续走 LLM 流程（指令在 extras 注入）
+        _uc_resumed_llm = True
+
     # 盲区自报识别（简单启发：在盲区定位阶段的所有发言都记录）
     if sess.state == "BLIND_SPOT" and user_message and "不知道" not in user_message[:6]:
         assessment.record_blind_spot(student, user_message)
@@ -528,6 +746,67 @@ async def process_message(
         _challenge_state_machine(student, user_message)
         _maybe_open_challenge(student)
 
+    # ---- V3.0 模块 L：双向有效交流——理解信号检测与处理（纯规则，纯学习模式关闭）----
+    # 孩子在教学节点表达模糊（"我不会""知道了""看不懂"等），先按信号短路确认，
+    # 不进 LLM（规格 L.2/L.3/L.4）。UNDER_CONFIRM 状态在函数头部已消费，这里不会重复。
+    understand_extra = ""
+    if not pure_mode and not _uc_resumed_llm and sess.state not in ("MODE_SELECT", "GREETING", "BLIND_SPOT", "UNDERSTAND_CONFIRM"):
+        try:
+            from backend.services.understand_detector import classify_utterance
+            _sig = classify_utterance(user_message or "")
+        except ImportError:
+            _sig = None
+        if _sig is not None:
+            sess.current_understand_signal = _sig.signal
+            # 防死循环：同一信号 2 轮内重复命中 → 不再短路，仅注入得体指令自然应对
+            _repeated = (
+                sess.last_understand_signal == _sig.signal
+                and sess.understand_signal_count - sess.last_understand_turn <= 2
+            )
+            sess.last_understand_signal = _sig.signal
+            sess.last_understand_turn = sess.understand_signal_count
+            sess.understand_signal_count += 1
+            understand_reply = ""
+            if not _repeated:
+                understand_reply = _build_understand_short_reply(student, _sig)
+            if understand_reply:
+                # 短路输出：确认流程话术（不发 LLM、不做评估，规格 L.2）
+                sess.history.append({"role": "user", "content": user_message})
+                sess.history.append({"role": "assistant", "content": understand_reply})
+                if len(sess.history) > MAX_HISTORY_MESSAGES * 2:
+                    sess.history = sess.history[-MAX_HISTORY_MESSAGES * 2 :]
+                sess.turn_count += 1
+                storage.save(student)
+                yield {"type": "text", "content": understand_reply}
+                yield {
+                    "type": "eval",
+                    "state": student.current_session.state,
+                    "badges": [],
+                    "progress": None,
+                    "emotion": None,
+                    "metacognition": "none",
+                    "anxiety": "low",
+                    "understand_signal": _sig.signal,
+                }
+                return
+            # 非短路信号（声称已懂 / 方法冲突 / 重复表达）→ 注入 LLM 对症指令
+            if _sig.signal == "claimed_understand":
+                understand_extra = (
+                    "[系统提示：孩子声称已懂。口头确认不算掌握（L.4）：不要直接接受，"
+                    "请出一道同类型变式题验证，她独立做对才算真掌握]"
+                )
+            elif _sig.signal == "method_conflict":
+                understand_extra = (
+                    "[系统提示：孩子提到的方法与当前讲解不同（方法冲突）。"
+                    "请先接住并肯定她的方法，再引导对比两种方法的异同与等价性，"
+                    "把新方法连回已有知识，绝不否定她的方法]"
+                )
+            elif _repeated and _sig.signal in ("cant_do", "text_confusion", "fake_understand", "metacognition_gap"):
+                understand_extra = (
+                    f"[系统提示：孩子反复表达「{_sig.detail}」。已确认过，本轮请收起程式化确认话术，"
+                    "直接对症推进：把难点拆成更小的步子、换一种具体讲法，或给出一个她一定能做的小练习]"
+                )
+
     system_prompt = persona.build_system_prompt(student)
 
     extras: list[str] = []
@@ -542,6 +821,18 @@ async def process_message(
             )
     if external_extra:
         extras.append(external_extra)
+    # V3.0 模块 L：理解信号对症指令（非短路路径：变式验证/方法冲突/重复表达）
+    if understand_extra:
+        extras.append(understand_extra)
+    # V3.0 模块 L：UNDER_CONFIRM 确认流程遗留的待执行指令（如"换讲法""只讲第N步"）
+    if sess.understand_pending_instruction:
+        extras.append(sess.understand_pending_instruction)
+        sess.understand_pending_instruction = ""
+    # V3.0 模块 L.7：上一轮认知负荷高 → 本轮降低讲解粒度
+    if not pure_mode and sess.last_cognitive_load == "high":
+        from backend.agent.strategy_engine import reduce_pace_instruction
+
+        extras.append(reduce_pace_instruction())
 
     # SAFE-P1-2：防沉迷时间提醒（温柔提示，不强制阻断）
     if user_message and sess.state not in ("MODE_SELECT", "BLIND_SPOT"):
@@ -825,6 +1116,39 @@ async def process_message(
         )
         for ev in _challenge_events:
             yield ev
+
+        # V3.0 模块 L.4.1：延迟验证结算（开场 30 秒热身作答后）
+        # 孩子作答完毕、eval 给出独立成功判定 → 结算昨日声称掌握的验证任务
+        if not pure_mode and sess.delayed_check_topic_id:
+            _dc_ind = eval_data.get("independent_success")
+            if isinstance(_dc_ind, bool):
+                from backend.services.mastery_tracker import record_delayed_check_result
+
+                _dc_topic = sess.delayed_check_topic_id
+                sess.delayed_check_topic_id = ""
+                res = record_delayed_check_result(student, _dc_topic, success=_dc_ind)
+                if not _dc_ind:
+                    # 假性掌握：掌握度已回退，下轮换讲法重新讲解（L.4.1）
+                    sess.understand_pending_instruction = (
+                        f"[系统提示：昨日声称掌握的「{_dc_topic}」延迟验证未通过"
+                        f"（掌握度已回退，假性掌握）。本轮请用与上次完全不同的讲法/比喻"
+                        f"重新讲解，先肯定她尝试的勇气]"
+                    )
+                yield {
+                    "type": "delayed_check_result",
+                    "data": {
+                        "topic_id": _dc_topic,
+                        "success": bool(_dc_ind),
+                        "prev_score": res.get("prev_score"),
+                        "new_score": res.get("new_score"),
+                        "rolled_back": res.get("rolled_back", False),
+                    },
+                }
+
+        # V3.0 模块 L.7：记录本轮认知负荷（供下一轮讲解粒度控制）
+        _cl = eval_data.get("cognitive_load")
+        if isinstance(_cl, str) and _cl in ("low", "medium", "high"):
+            sess.last_cognitive_load = _cl
 
         # 从 eval 自动识别当前主题（优先 mastery_updates，其次 gaps_found/gaps_cleared）
         if not sess.topic_id:

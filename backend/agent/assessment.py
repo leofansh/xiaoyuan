@@ -14,6 +14,15 @@ VALID_STATES = {
     "WRAP_UP", "DONE", "THINKING_TRAINING",
     # D1：动态化新增状态
     "ANALOGY_EXPLANATION", "VISUALIZATION", "ERROR_ROOT_CAUSE", "BREAK_SUGGESTION",
+    # V3.0 模块 L：双向有效交流确认态（费曼复述 / 台阶诊断，结束后恢复原状态）
+    "UNDER_CONFIRM",
+}
+
+# V3.0 模块 L：可进入 UNDER_CONFIRM 的教学节点（与 chat.TEACHING_STATES 对齐）
+_UNDER_CONFIRM_ENTRY_STATES = {
+    "CORE_DERIVE", "EXAMPLE_CHECK", "OPTIONAL_VARIANT", "QUICK_REVIEW",
+    "FIX_ONE_ERROR", "WEEKEND_CLEAR", "ANALOGY_EXPLANATION", "VISUALIZATION",
+    "ERROR_REVIEW", "ERROR_ROOT_CAUSE", "BREAK_SUGGESTION", "THINKING_TRAINING",
 }
 
 VALID_TRANSITIONS = {
@@ -39,7 +48,12 @@ VALID_TRANSITIONS = {
     "VISUALIZATION": {"CORE_DERIVE", "EXAMPLE_CHECK", "BREAK_SUGGESTION"},
     "ERROR_ROOT_CAUSE": {"FIX_ONE_ERROR", "CORE_DERIVE", "WRAP_UP", "BREAK_SUGGESTION"},
     "BREAK_SUGGESTION": {"CORE_DERIVE", "EXAMPLE_CHECK", "WRAP_UP", "BREAK_SUGGESTION"},
+    # V3.0 模块 L：确认态（费曼复述 / 台阶诊断）完成后恢复原教学状态
+    "UNDER_CONFIRM": _UNDER_CONFIRM_ENTRY_STATES,
 }
+# V3.0 模块 L：教学节点可进入确认态（chat 层短路进入，不依赖 LLM 建议）
+for _entry in _UNDER_CONFIRM_ENTRY_STATES:
+    VALID_TRANSITIONS.setdefault(_entry, set()).add("UNDER_CONFIRM")
 
 
 def apply_eval(student: Student, eval_data: dict, *, suppress_combo: bool = False) -> list[str]:

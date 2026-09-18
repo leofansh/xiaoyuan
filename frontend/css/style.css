@@ -830,3 +830,34 @@ body {
 .domain-bar-track { flex: 1; height: 8px; background: rgba(0,0,0,0.06); border-radius: 4px; overflow: hidden; }
 .domain-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
 .domain-bar-pct { width: 36px; font-size: 12px; font-weight: 600; }
+
+/* ============================================================
+   V3.0 模块 L.8：数轴 / 线段图可视化组件
+   由 <<<XIAOYUAN_VIS>>> 标记块触发，前端渲染为内联 SVG
+   ============================================================ */
+.xy-vis {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 8px auto;
+  background: var(--light);
+  border-radius: 12px;
+  padding: 6px 10px;
+  box-shadow: var(--soft-shadow);
+}
+
+/* 数轴 */
+.xy-numberline .vis-title { fill: var(--main-strong); font-size: 15px; font-weight: 600; }
+.xy-numberline .vis-axis { stroke: var(--muted); }
+.xy-numberline polygon.vis-axis { fill: var(--muted); stroke: none; }
+.xy-numberline .vis-tick { stroke: var(--muted); }
+.xy-numberline .vis-tick-label { fill: var(--muted); font-size: 12px; }
+.xy-numberline .vis-range { stroke: var(--main); opacity: 0.55; }
+.xy-numberline .vis-point-solid { fill: var(--accent); stroke: #fff; stroke-width: 1.5; }
+.xy-numberline .vis-point-open { fill: var(--light); stroke: var(--accent); stroke-width: 2; }
+.xy-numberline .vis-point-label { fill: var(--main-strong); font-size: 13px; font-weight: 600; }
+
+/* 线段图 */
+.xy-segment .vis-title { fill: var(--main-strong); font-size: 15px; font-weight: 600; }
+.xy-segment .vis-seg-label { fill: var(--main-strong); font-size: 13px; font-weight: 500; }
+.xy-segment .vis-seg-value { fill: #fff; font-size: 14px; font-weight: 700; }

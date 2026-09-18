@@ -276,3 +276,18 @@ def strategy_instruction(strategy: TeachingStrategy) -> str:
     for i, step in enumerate(strategy.steps, 1):
         lines.append(f"{i}. {step}")
     return "\n".join(lines)
+
+
+def reduce_pace_instruction() -> str:
+    """认知负荷过高时的讲解粒度降级指令（V3.0 模块 L.7）。
+
+    上一轮 LLM 评估 cognitive_load = high 时由 chat 层注入：
+    限制信息量、放慢节奏、单步确认，防止孩子再次超载。
+    """
+    return (
+        "[系统提示：上一轮评估孩子认知负荷偏高。本轮请主动降速："
+        "①一次只讲一个最基础的要点，不展开推导与多步例题；"
+        "②多用生活化比喻或具体例子锚定直觉；"
+        "③每讲一步先停下来确认她跟上（问她'这步明白吗'或让她复述），"
+        "④绝不赶进度、绝不一次性塞多个概念]"
+    )

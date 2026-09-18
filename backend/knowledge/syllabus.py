@@ -26,6 +26,8 @@ class KnowledgeNode:
     # E2：掌握度判定标准（可观察可验证）+ 典型错误模式
     mastery_criteria: list[str] = field(default_factory=list)
     typical_errors: list[str] = field(default_factory=list)  # ERROR_PATTERN_LIBRARY ID
+    # L3：台阶式诊断（3~5 个台阶，每台阶一个核心动作，见 get_diagnostic_steps）
+    diagnostic_steps: list[dict] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -66,6 +68,13 @@ NODES: list[KnowledgeNode] = [
         is_core=True,
         common_mistakes=["通分找错最小公倍数", "约分不彻底", "分数除法没颠倒"],
         life_examples=["披萨切分", "做蛋糕配料比例"],
+        # L3：台阶式诊断
+        diagnostic_steps=[
+            {"step": 1, "name": "看分母", "check_question": "先看两个分数的分母，你找得到它们的最小公倍数吗？"},
+            {"step": 2, "name": "通分", "check_question": "把分母变成一样（进行通分），你会吗？"},
+            {"step": 3, "name": "加减分子", "check_question": "分母一样后，只把分子相加减，你会吗？"},
+            {"step": 4, "name": "约分", "check_question": "结果要化成最简分数（约分），你会吗？"},
+        ],
     ),
     KnowledgeNode(
         id="elem_xiaoshu",
@@ -258,6 +267,14 @@ NODES: list[KnowledgeNode] = [
         difficulty=2,
         common_mistakes=["等量关系找错", "设未知数表述不清"],
         life_examples=["压岁钱规划", "班级分组"],
+        # L3：台阶式诊断
+        diagnostic_steps=[
+            {"step": 1, "name": "找未知数", "check_question": "题目让我们求什么？把它设为 x，你会吗？"},
+            {"step": 2, "name": "找等量关系", "check_question": "题目里哪句话说明了两边相等？你能找到吗？"},
+            {"step": 3, "name": "列方程", "check_question": "把等量关系用式子写出来，你会吗？"},
+            {"step": 4, "name": "解方程", "check_question": "解出 x 的值，你会吗？"},
+            {"step": 5, "name": "检验作答", "check_question": "把答案代回去检验，并写出答句，你会吗？"},
+        ],
     ),
     KnowledgeNode(
         id="6a_fangcheng_jie",
@@ -281,6 +298,14 @@ NODES: list[KnowledgeNode] = [
             "能解释每一步变形的依据（等式性质）",
         ],
         typical_errors=["calc_sign_error", "concept_condition_unclear", "read_miss_condition"],
+        # L3：台阶式诊断（孩子说不出卡点时逐台阶定位）
+        diagnostic_steps=[
+            {"step": 1, "name": "去分母", "check_question": "如果方程里有分母，你第一步会先做什么？"},
+            {"step": 2, "name": "去括号", "check_question": "这步是把括号拆开（注意分配律），你会吗？"},
+            {"step": 3, "name": "移项", "check_question": "把含 x 的项移到一边、常数移到另一边，要变号，你会吗？"},
+            {"step": 4, "name": "合并同类项", "check_question": "把相同的项合并成一个，你会吗？"},
+            {"step": 5, "name": "系数化 1", "check_question": "让 x 前面的数变成 1（两边同除以系数），你会吗？"},
+        ],
     ),
     KnowledgeNode(
         id="6a_fangcheng_yy",
@@ -454,6 +479,14 @@ NODES: list[KnowledgeNode] = [
         difficulty=2,
         common_mistakes=["含字母系数的方程讨论不全", "应用题设未知数不恰当"],
         life_examples=["行程问题、工程问题、浓度问题"],
+        # L3：台阶式诊断
+        diagnostic_steps=[
+            {"step": 1, "name": "审题设元", "check_question": "先读清楚题目要求什么，把未知量设出来，你会吗？"},
+            {"step": 2, "name": "找等量关系", "check_question": "找出题目中的等量关系（如路程=速度×时间），你会吗？"},
+            {"step": 3, "name": "列方程", "check_question": "按等量关系列出方程，你会吗？"},
+            {"step": 4, "name": "解方程", "check_question": "按解方程五步把它解出来，你会吗？"},
+            {"step": 5, "name": "检验与作答", "check_question": "检验答案是否符合题意，再完整作答，你会吗？"},
+        ],
     ),
     # --- 几何初步 ---
     KnowledgeNode(
@@ -966,5 +999,33 @@ def node_id_in_own_chain(n: KnowledgeNode) -> bool:
         if node:
             stack.extend(node.prerequisites)
     return False
+
+
+def get_diagnostic_steps(node: KnowledgeNode) -> list[dict]:
+    """取知识点的台阶式诊断步骤（模块 L.3）。
+
+    - 节点配置了 diagnostic_steps（3~5 个台阶）→ 直接返回
+    - 未配置 → 用常见误区生成通用台阶兜底（仍可定位到误区层面）
+
+    Returns:
+        台阶列表 [{"step": n, "name": str, "check_question": str}, ...]
+    """
+    if getattr(node, "diagnostic_steps", None):
+        return node.diagnostic_steps
+    mistakes = node.common_mistakes or []
+    steps = []
+    for i, m in enumerate(mistakes[:4], start=1):
+        steps.append({
+            "step": i,
+            "name": m if len(m) <= 12 else m[:12],
+            "check_question": f"这一处（{m}）你觉得有问题吗？",
+        })
+    if not steps:
+        steps.append({
+            "step": 1,
+            "name": "概念理解",
+            "check_question": f"「{node.name}」的核心意思，你能用自己的话说说吗？",
+        })
+    return steps
 
 

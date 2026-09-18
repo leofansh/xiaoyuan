@@ -564,6 +564,41 @@ def build_system_prompt(student: Student) -> str:
     if challenge_ctx:
         context_parts.append(challenge_ctx)
 
+    # V3.0 模块 L：双向有效交流（L.5 语言层级 + L.6 术语管理纪律 + L.3 费曼理解验证协议）
+    # 每次组 prompt 时按年级/认知画像刷新语言层级（幂等，start_session 已设初值）
+    student.ensure_language_level()
+    try:
+        from backend.knowledge.terms import terms_instruction
+
+        context_parts.append(f"- 学生语言层级：{student.language_level}（1~4，越低用词越简单、句子越短）")
+        context_parts.append(terms_instruction(student.language_level))
+    except Exception:
+        pass  # 术语库异常不阻断主流程
+
+    _feynman_protocol = (
+        "## 费曼理解验证协议（双向有效交流，必须遵守）\n"
+        "- 核心概念讲完后，主动请孩子当小老师复述（「你能用自己的话讲给我听吗？」）\n"
+        "- 孩子复述流畅准确 → 明确表扬「你讲得比我还清楚」，再进入变式练习\n"
+        "- 孩子复述卡壳/错误 → 不打断，听完后只补她讲错的那一块，再请她复述一次\n"
+        "- 复述通过后给出变式题（换数字/换情境），单独做对才算真正掌握\n"
+        "- 当轮未通过复述时，绝不推入新知识点"
+    )
+    context_parts.append(_feynman_protocol)
+
+    # V3.0 模块 L：双向有效交流（L.8 可视化讲解——数轴/线段图）
+    # 小圆在正文中插入 <<<XIAOYUAN_VIS>>> 标记块，前端自动渲染为图形
+    _vis_protocol = (
+        "## 可视化讲解标记块（L.8，可选触发）\n"
+        "- 讲解数轴类内容（不等式解集、正负数大小比较、绝对值的数轴意义等）时，可插入数轴图帮助理解：\n"
+        '<<<XIAOYUAN_VIS>>>\n{"type":"numberline","min":-3,"max":4,"title":"x 的解集","points":[{"pos":2,"label":"2","solid":true}],"highlight":{"from":-3,"to":2,"openStart":true,"openEnd":true}}\n<<<END_VIS>>>\n'
+        "- 讲解应用题的数量关系（行程、工程、和差倍分等）时，可插入线段图帮助理清：\n"
+        '<<<XIAOYUAN_VIS>>>\n{"type":"segment","title":"全程 120km","segments":[{"label":"已行 40km","value":40},{"label":"剩余 80km","value":80}]}\n<<<END_VIS>>>\n'
+        "- 数轴字段：type=numberline、min/max 必填、points=[{pos,label,solid}]、highlight={from,to,openStart,openEnd}、title 可选\n"
+        "- 线段图字段：type=segment、segments=[{label,value,color?}]、title 可选\n"
+        "- 规则：标记块必须完整成对、独立成段；每句回复最多用 1 个可视化块；JSON 必须用英文双引号合法输出"
+    )
+    context_parts.append(_vis_protocol)
+
     return prompt + "\n".join(context_parts)
 
 
