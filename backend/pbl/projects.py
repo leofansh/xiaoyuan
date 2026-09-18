@@ -211,6 +211,232 @@ PBL_PROJECTS: dict[str, dict] = {
         "locked": False,
         "prerequisite_project": None,
     },
+    "minecraft_building": {
+        "id": "minecraft_building",
+        "name": "我的世界建筑",
+        "icon": "🧱",
+        "description": "你是一名方块建筑师，用一块块砖搭出城墙、房间、坐标小镇和立体仓库！",
+        "category": "游戏/建筑",
+        "interests": ["游戏", "建筑", "创造", "科学"],
+        "difficulty": "beginner",
+        "estimated_time": "2-4小时",
+        "knowledge_coverage": ["几何", "坐标", "比例", "体积"],
+        "grade_range": "三~六年级",
+        "levels": [
+            {
+                "id": 1,
+                "name": "城墙工程师",
+                "description": "给小镇修一段城墙，每块砖长 1 格，铺到正好 12 格长。",
+                "simulator_type": "building_level1",
+                "simulator_config": {
+                    "mode": "length",
+                    "target_length": 12,
+                    "grid_cols": 14,
+                    "grid_rows": 4,
+                },
+                "completion_criteria": {"hit_target": True},
+                "rewards": {"xp": 30, "card": "card_thinking_visual"},
+                "level_knowledge": [
+                    {
+                        "id": "6a_xianduan",
+                        "name": "线段的比较与和差倍",
+                        "explanation": (
+                            "铺城墙就是在数线段：从第一块砖到第十二块砖，正好 12 个单位长。"
+                            "看一段线段有多长，就是数它包含几个单位长度。"
+                        ),
+                    },
+                ],
+            },
+            {
+                "id": 2,
+                "name": "地砖设计师",
+                "description": "房间长 6 米、宽 4 米，用 1m² 的地砖铺满，需要多少块？",
+                "simulator_type": "building_level2",
+                "simulator_config": {
+                    "mode": "area",
+                    "room_w": 6,
+                    "room_h": 4,
+                    "target_area": 24,
+                    "grid_cols": 8,
+                    "grid_rows": 6,
+                },
+                "completion_criteria": {"hit_target": True},
+                "rewards": {"xp": 40, "card": "card_thinking_modeling"},
+                "level_knowledge": [
+                    {
+                        "id": "elem_mianji",
+                        "name": "面积公式",
+                        "explanation": (
+                            "地砖数 = 房间面积 = 长 × 宽。6×4=24，所以需要 24 块 1m² 的砖。"
+                            "面积就是'一个面里能铺下多少个单位正方形'。"
+                        ),
+                    },
+                ],
+            },
+            {
+                "id": 3,
+                "name": "坐标规划师",
+                "description": "规划师用坐标指挥搭建：在 (3,2) 放红色方块、(-2,4) 放蓝色方块、(0,-3) 放绿色方块。",
+                "simulator_type": "building_level3",
+                "simulator_config": {
+                    "mode": "coordinate",
+                    "grid_cols": 11,
+                    "grid_rows": 9,
+                    "axis_range": [-5, 5],
+                    "targets": [
+                        {"color": "red", "x": 3, "y": 2},
+                        {"color": "blue", "x": -2, "y": 4},
+                        {"color": "green", "x": 0, "y": -3},
+                    ],
+                },
+                "completion_criteria": {"hit_target": True},
+                "rewards": {"xp": 50, "card": "card_thinking_reverse"},
+                "level_knowledge": [
+                    {
+                        "id": "7b_pingmianzhijiao",
+                        "name": "平面直角坐标系",
+                        "explanation": (
+                            "(3,2) 意思是先往右走 3 格，再往上走 2 格。坐标就是地图上的'经纬度'，"
+                            "把'第几个'和'第几层'都说得清清楚楚。"
+                        ),
+                    },
+                    {
+                        "id": "6a_shuzhou",
+                        "name": "数轴",
+                        "explanation": (
+                            "负数坐标往左/往下走：(-2,4) 就是先往左 2 格再往上 4 格。"
+                            "数轴的方向感是坐标的基础。"
+                        ),
+                    },
+                ],
+            },
+            {
+                "id": 4,
+                "name": "缩放建造师",
+                "description": "设计图画的长 3 格、宽 2 格，比例尺 1:2——真实尺寸要放大几倍？在地块上铺出来。",
+                "simulator_type": "building_level4",
+                "simulator_config": {
+                    "mode": "scale",
+                    "design_w": 3,
+                    "design_h": 2,
+                    "scale": 2,
+                    "scale_label": "1:2",
+                    "target_w": 6,
+                    "target_h": 4,
+                    "grid_cols": 10,
+                    "grid_rows": 8,
+                },
+                "completion_criteria": {"hit_target": True},
+                "rewards": {"xp": 60, "card": "card_thinking_transform"},
+                "level_knowledge": [
+                    {
+                        "id": "elem_fenshu",
+                        "name": "分数运算",
+                        "explanation": (
+                            "比例尺 1:2 就是'图上 1 格 = 真实 2 格'，真实尺寸 = 图上尺寸 × 2，"
+                            "也就是 ×(2/1)。把比看成倍数，缩放就变成了乘法。"
+                        ),
+                    },
+                    {
+                        "id": "elem_sifasuan",
+                        "name": "四则运算",
+                        "explanation": (
+                            "3 格放成 3×2=6 格、2 格放成 2×2=4 格。缩放就是把每个尺寸都乘上"
+                            "同一个倍数，不能只改一条边。"
+                        ),
+                    },
+                ],
+            },
+            {
+                "id": 5,
+                "name": "立体仓库",
+                "description": "给小镇设计一个长方体仓库，长 5、宽 3、高 2，体积要达到 30m³。",
+                "simulator_type": "building_level5",
+                "simulator_config": {
+                    "mode": "volume",
+                    "target_volume": 30,
+                    "length_range": [1, 8],
+                    "width_range": [1, 8],
+                    "height_range": [1, 8],
+                },
+                "completion_criteria": {"hit_target": True},
+                "rewards": {"xp": 80, "card": "card_thinking_decomp"},
+                "level_knowledge": [
+                    {
+                        "id": "elem_tiji",
+                        "name": "体积公式",
+                        "explanation": (
+                            "仓库体积 = 长 × 宽 × 高。5×3×2=30，正好 30m³。"
+                            "体积就是'里面能装几个 1m³ 的小方块'。"
+                        ),
+                    },
+                    {
+                        "id": "6b_changfangti",
+                        "name": "长方体的再认识",
+                        "explanation": (
+                            "仓库就是长方体：有长、宽、高三个方向。缺一个尺寸，体积就算不出来"
+                            "（乘三个数才能得到体积）。"
+                        ),
+                    },
+                ],
+            },
+            {
+                "id": 6,
+                "name": "建筑大师",
+                "description": "自由创造！用方块搭一座你自己的建筑，搭完保存成作品。",
+                "simulator_type": "building_level6",
+                "simulator_config": {
+                    "mode": "creator",
+                    "grid_cols": 10,
+                    "grid_rows": 8,
+                    "max_height": 6,
+                },
+                "completion_criteria": {"hit_target": True},
+                "rewards": {"xp": 120, "card": "card_thinking_modeling"},
+                "level_knowledge": [
+                    {
+                        "id": "elem_mianji",
+                        "name": "面积公式",
+                        "explanation": (
+                            "你的建筑占地面子 = 长 × 宽，每个柱底都是 1×1 = 1m²。"
+                        ),
+                    },
+                    {
+                        "id": "elem_tiji",
+                        "name": "体积公式",
+                        "explanation": (
+                            "建筑总体积 = 所有方块数 = 占地底面积 × 平均高度，"
+                            "把搭建的每个方块数一数，就是体积。"
+                        ),
+                    },
+                ],
+            },
+        ],
+        "choices": [
+            {
+                "id": "lv3_build_choice",
+                "at_level": 3,
+                "prompt": "城市蓝图打开了！你想先当哪一种建筑师？",
+                "options": [
+                    {
+                        "id": "builder_first",
+                        "label": "先做图纸放大师（缩放）",
+                        "hint": "把设计图按比例放大成真房子",
+                        "focus": "building",
+                    },
+                    {
+                        "id": "warehouse_first",
+                        "label": "先做仓库规划师（体积）",
+                        "hint": "算好长宽高，装下所有物资",
+                        "focus": "volume",
+                    },
+                ],
+            },
+        ],
+        "badge": "badge_building_master",
+        "locked": False,
+        "prerequisite_project": None,
+    },
 }
 
 

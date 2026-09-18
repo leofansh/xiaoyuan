@@ -195,6 +195,10 @@ def _choice_next_intro(option: dict) -> str:
         return f"好，你选了「{label}」。那我们继续前进！记住：顶风时导弹会被吹偏、射程变短，需要加大力度并压低角度。"
     if focus == "distance":
         return f"好，你选了「{label}」。那我们继续前进！记住：距离越远，角度的小误差被放大得越明显，瞄准时要更耐心地微调。"
+    if focus == "building":
+        return f"好，你选了「{label}」。那我们开始放大图纸吧！记住：比例尺是 1:2 时，每个尺寸都要乘 2，只放大一条边的话房子就歪啦。"
+    if focus == "volume":
+        return f"好，你选了「{label}」。那我们开始规划仓库吧！记住：体积 = 长 × 宽 × 高，三个尺寸都要选好。"
     return f"好，你选了「{label}」。让我们继续前进吧！"
 
 

@@ -1,0 +1,302 @@
+/* ============================================================
+   小圆助教 · 模块「🧱 我的世界建筑」模拟器样式 (building.css)
+   颜色沿用 style.css 主题变量；深色网格地面 + 半透明方块让背景主题色透出
+   ============================================================ */
+
+.bld-sim {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--bg2, #ebf4e3);
+  border-radius: 16px;
+  background: var(--bg1, #f7fbf3);
+  box-shadow: var(--soft-shadow, 0 6px 18px rgba(150, 187, 133, .28));
+}
+
+/* ---------------- 画布容器 ---------------- */
+.bld-canvas-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--bg2, #ebf4e3);
+  background: transparent;
+}
+
+.bld-canvas {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+}
+
+/* ---------------- 状态栏 ---------------- */
+.bld-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+.bld-attempts {
+  color: var(--muted, #97a78d);
+  font-weight: 600;
+}
+
+.bld-result {
+  color: var(--accent, #7ca26c);
+  font-weight: 700;
+}
+
+/* ---------------- 工具条 ---------------- */
+.bld-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px 16px;
+  flex-wrap: wrap;
+}
+
+.bld-toolbar-col {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.bld-hint {
+  font-size: 12.5px;
+  color: var(--muted, #97a78d);
+  flex: 1 1 auto;
+  min-width: 160px;
+}
+
+.bld-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ---------------- 按钮 ---------------- */
+.bld-btn {
+  border: 1px solid var(--main, #96bb85);
+  background: var(--chip-bg, #f2f8ec);
+  color: var(--chip-text, #77966a);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all .2s;
+  white-space: nowrap;
+}
+
+.bld-btn:hover {
+  border-color: var(--main-strong, #83ab72);
+  background: var(--bg2, #ebf4e3);
+  box-shadow: var(--soft-shadow, 0 6px 18px rgba(150, 187, 133, .28));
+}
+
+.bld-btn:active {
+  transform: translateY(1px);
+}
+
+.bld-btn-submit {
+  background: var(--accent, #7ca26c);
+  border-color: var(--accent, #7ca26c);
+  color: #fff;
+}
+
+.bld-btn-submit:hover {
+  background: var(--main-strong, #83ab72);
+  border-color: var(--main-strong, #83ab72);
+  color: #fff;
+}
+
+.bld-btn-help {
+  border-color: var(--accent, #7ca26c);
+  color: var(--accent, #7ca26c);
+}
+
+/* ---------------- 颜色选择（坐标 / 创作） ---------------- */
+.bld-colorbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.bld-color-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background: var(--c, #999);
+  cursor: pointer;
+  transition: transform .15s, border-color .15s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .2);
+}
+
+.bld-color-btn:hover {
+  transform: scale(1.08);
+}
+
+.bld-color-btn.active {
+  border-color: #333;
+  box-shadow: 0 0 0 2px var(--bg1, #f7fbf3), 0 0 0 4px #333;
+}
+
+.bld-legend {
+  font-size: 12px;
+  color: var(--muted, #97a78d);
+}
+
+/* ---------------- 目标清单（坐标模式） ---------------- */
+.bld-targets {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px dashed var(--main, #96bb85);
+  border-radius: 12px;
+  background: var(--chip-bg, #f2f8ec);
+}
+
+.bld-targets-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent, #7ca26c);
+}
+
+.bld-target {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text, #444);
+  padding: 4px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.bld-target:hover {
+  background: rgba(0, 0, 0, .04);
+}
+
+.bld-target.active {
+  background: var(--bg2, #ebf4e3);
+  font-weight: 700;
+}
+
+.bld-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+/* ---------------- 步进输入（缩放模式） ---------------- */
+.bld-steppers {
+  display: flex;
+  gap: 12px 20px;
+  flex-wrap: wrap;
+}
+
+.bld-stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bld-step-name {
+  font-size: 13px;
+  color: var(--text, #444);
+  font-weight: 600;
+}
+
+.bld-step-btn {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--main, #96bb85);
+  background: var(--chip-bg, #f2f8ec);
+  color: var(--chip-text, #77966a);
+  font-size: 16px;
+  font-weight: 700;
+  border-radius: 8px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.bld-step-btn:hover {
+  background: var(--bg2, #ebf4e3);
+}
+
+.bld-step-val {
+  min-width: 2.4em;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent, #7ca26c);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------- 滑块（体积模式） ---------------- */
+.bld-sliders {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bld-slider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bld-slider-name {
+  flex-shrink: 0;
+  min-width: 1.6em;
+  font-size: 13px;
+  color: var(--text, #444);
+  font-weight: 600;
+}
+
+.bld-slider input[type="range"] {
+  flex: 1;
+  min-width: 100px;
+  accent-color: var(--main, #96bb85);
+  cursor: pointer;
+}
+
+.bld-slider-val {
+  flex-shrink: 0;
+  min-width: 2em;
+  text-align: right;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent, #7ca26c);
+  font-variant-numeric: tabular-nums;
+}
+
+.bld-formula {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text, #444);
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--chip-bg, #f2f8ec);
+  text-align: center;
+}
+
+/* ---------------- 响应式 ---------------- */
+@media (max-width: 640px) {
+  .bld-sim { padding: 10px; }
+  .bld-status { flex-direction: column; align-items: flex-start; }
+  .bld-toolbar { align-items: stretch; }
+  .bld-actions { width: 100%; }
+  .bld-actions .bld-btn { flex: 1 1 auto; }
+  .bld-steppers { flex-direction: column; gap: 8px; }
+}
