@@ -35,6 +35,34 @@ _INTRINSIC_POSITIVE_FEEDBACK = [
     "你越来越会安排自己的学习啦",
 ]
 
+# 小圆动态表情：开场心情 → 头像表情映射（😊开心/😐平静/😣疲惫）
+_MOOD_AVATAR = {"😊": "happy", "😐": "calm", "😣": "tired"}
+
+
+def _derive_avatar_emotion(eval_data: dict | None, new_badges: list | None = None) -> str:
+    """从小圆（AI 助教）视角派生头像表情 avatar_emotion。
+
+    依据"学生情绪 + 会话事件"按优先级从高到低派生：
+    徽章 > 顿悟 > 高焦虑 > 学生情绪 > 默认平静。
+    危机短路分支不经过此函数（在调用处单独处理）。
+    """
+    if new_badges:
+        return "proud"
+    data = eval_data or {}
+    # 顿悟/理解通过信号（eval_data 无此字段则跳过）
+    if data.get("insight_detected"):
+        return "surprised"
+    if data.get("anxiety_level") == "high":
+        return "worried"
+    emotion = data.get("emotion")
+    if emotion == "confident":
+        return "happy"
+    if emotion == "frustrated":
+        return "sad"
+    if emotion == "tired":
+        return "tired"
+    return "calm"
+
 
 def start_session(student: Student, mood: str, source: str = "主动打开") -> dict:
     """开始新会话：记录心情，生成开场白与模式建议。
@@ -156,6 +184,8 @@ def start_session(student: Student, mood: str, source: str = "主动打开") -> 
         "review_hint": review_hint,
         # L.4.1：标记本次开场是否带延迟验证（前端可据此弱化复习提示）
         "delayed_check": bool(sess.delayed_check_topic_id),
+        # 小圆动态表情：开场头像表情（按心情打卡派生）
+        "avatar_emotion": _MOOD_AVATAR.get(mood, "calm"),
     }
 
 
@@ -715,6 +745,8 @@ async def process_message(
             "anxiety": "high",
             "crisis": True,
             "crisis_level": crisis_level,
+            # 小圆动态表情：危机时小圆担忧/难过（severe→sad，其余→worried）
+            "avatar_emotion": "sad" if crisis_level == "severe" else "worried",
         }
         return
 
@@ -1294,6 +1326,8 @@ async def process_message(
         "anxiety": (eval_data or {}).get("anxiety_level", "low"),
         "used_thinking_model": (eval_data or {}).get("used_thinking_model"),
         "student_initiated_model": (eval_data or {}).get("student_initiated_model"),
+        # 小圆动态表情：由学生情绪 + 会话事件派生（文本流之后到达）
+        "avatar_emotion": _derive_avatar_emotion(eval_data, new_badges),
     }
 
 

@@ -465,6 +465,7 @@ async function startSession(mood) {
   try {
     const info = await api("/api/session/start", { student_id: studentId, mood });
     replaceLastAi(info.opening);
+    if (info.avatar_emotion) setAvatarEmotion(info.avatar_emotion);
     startTimer();
     loadProgressHeader();
   // V3.0 P0：开场用兴趣搭讪式，不再自动弹出模式快捷栏（学从聊天自然发生）
@@ -496,6 +497,21 @@ function replaceLastAi(text) {
   const last = bubbles[bubbles.length - 1];
   last.classList.remove("typing-dot");
   last.innerHTML = renderMathText(text);
+}
+
+// ---------------------------------------------------------------- 小圆动态表情
+const AVATAR_EMOTIONS = {
+  proud: "😎", happy: "😊", worried: "😟", sad: "😢",
+  tired: "😴", surprised: "😮", calm: "🐱",
+};
+
+function setAvatarEmotion(emotion) {
+  const avatars = document.querySelectorAll("#chat-scroll .msg.ai .avatar");
+  const el = avatars[avatars.length - 1];
+  if (!el) return;
+  const key = AVATAR_EMOTIONS[emotion] ? emotion : "calm";
+  el.textContent = AVATAR_EMOTIONS[key];
+  el.className = `avatar avatar-${key}`;
 }
 
 const MODE_LABELS = { A: "🌟 深度成长", B: "🛡 保底维稳", weekend: "🧹 周末修复" };
@@ -574,6 +590,7 @@ async function consumeSSE(resp, bubble) {
       } else if (type === "insight_event") {
         // V3.0 P0/I-11.9#5: 顿悟时刻庆祝（规格 11.9.2）
         bubble.classList.remove("typing-dot");
+        setAvatarEmotion("surprised");
         const quote = data.student_quote || "";
         bubble.innerHTML = renderMathText(
           `✨ 顿悟时刻！${quote ? `"${quote}"` : ""}` +
@@ -597,6 +614,7 @@ async function consumeSSE(resp, bubble) {
       } else if (type === "challenge_success") {
         // V3.0 P0/I-11.9#4: 挑战成功庆祝（规格 11.9.4：3-5倍XP + 必掉稀有以上卡）
         bubble.classList.remove("typing-dot");
+        setAvatarEmotion("proud");
         const chTitle = data.title || "挑战题";
         bubble.innerHTML = renderMathText(
           `🏆 太棒了！你独立完成了挑战《${chTitle}》！\n\n` +
@@ -999,6 +1017,19 @@ $("#chat-input").addEventListener("keydown", e => {
 });
 
 function handleEval(data) {
+  if (data.avatar_emotion) {
+    setAvatarEmotion(data.avatar_emotion);
+  } else if (data.crisis) {
+    setAvatarEmotion("sad");
+  } else if (data.emotion === "confident") {
+    setAvatarEmotion("happy");
+  } else if (data.emotion === "frustrated") {
+    setAvatarEmotion("sad");
+  } else if (data.emotion === "tired") {
+    setAvatarEmotion("tired");
+  } else {
+    setAvatarEmotion("calm");
+  }
   if (data.badges && data.badges.length) {
     data.badges.forEach(b => {
       toast(`🎉 获得新徽章：${b}`, 3200);
