@@ -202,6 +202,90 @@ def get_notifications(student_id: str):
     return {"notifications": s.parent_notifications}
 
 
+@app.get("/api/student/{student_id}/family-challenge")
+def get_family_challenge(student_id: str):
+    """「教爸妈」家庭挑战（11.8）：获取本周挑战与完成状态。"""
+    from backend.services.parent_notification import weekly_teach_parent_challenge
+
+    s = _load_student(student_id)
+    challenge = weekly_teach_parent_challenge(s)
+    challenge_id = challenge["challenge_id"]
+    completed_this_week = any(
+        c.get("type") == "family_challenge" and c.get("challenge_id") == challenge_id
+        for c in (s.creations or [])
+    )
+    return {
+        "challenge": challenge,
+        "completed_this_week": completed_this_week,
+        "student_name": s.name,
+    }
+
+
+@app.post("/api/student/{student_id}/family-challenge/complete")
+async def family_challenge_complete(student_id: str):
+    """「教爸妈」家庭挑战（11.8）：幂等完成结算，奖励宠物 XP 并通知家长。"""
+    from backend.services.parent_notification import weekly_teach_parent_challenge
+    from backend.services.pet import add_xp, ensure_pet
+
+    storage = get_storage()
+    lock = storage.get_lock(student_id)
+    async with lock:
+        s = _load_student(student_id)
+        challenge = weekly_teach_parent_challenge(s)
+        challenge_id = challenge["challenge_id"]
+        topic = challenge["knowledge_topic"]
+
+        already_done = any(
+            c.get("type") == "family_challenge" and c.get("challenge_id") == challenge_id
+            for c in (s.creations or [])
+        )
+        if already_done:
+            return {
+                "success": True,
+                "xp_gained": 0,
+                "already_done": True,
+                "feedback": "这周的挑战已经完成啦，教爸妈的小老师真棒！",
+                "pet_feed": None,
+            }
+
+        now = datetime.now()
+        s.creations.append({
+            "type": "family_challenge",
+            "challenge_id": challenge_id,
+            "topic": topic,
+            "created_at": now.isoformat(timespec="seconds"),
+        })
+
+        s.pet = ensure_pet(s.pet)
+        pet_feed = add_xp(s.pet, 50, source="family_challenge")
+
+        s.parent_notifications.append({
+            "id": f"family_challenge_{challenge_id}",
+            "student_id": s.id,
+            "type": "family_challenge",
+            "severity": "positive",
+            "title": "「家庭挑战」完成啦 ✨",
+            "message": (
+                f"{s.name} 这周当了一回小老师，把刚学会的「{topic}」讲给了爸爸妈妈听，"
+                "全家一起完成了一个小任务！教一遍，记得比做十道题还牢。去夸夸她吧！"
+            ),
+            "created_at": now.isoformat(),
+            "read": False,
+        })
+
+        storage.save(s)
+        return {
+            "success": True,
+            "xp_gained": 50,
+            "already_done": False,
+            "feedback": "太棒了！孩子当了一回小老师！",
+            "pet_feed": {
+                k: pet_feed[k]
+                for k in ("xp_gained", "new_exp", "leveled_up", "new_level", "unlocked_skin")
+            },
+        }
+
+
 @app.get("/api/student/{student_id}/learning-plan")
 def get_learning_plan(student_id: str):
     """获取本周学习计划（D2）。"""

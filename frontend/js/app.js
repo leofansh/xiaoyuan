@@ -777,10 +777,59 @@ async function submitProblem(problem, answer, judge) {
   }
 }
 
+// ---------------------------------------------------------------- 家庭挑战卡片（118 家长角色重塑）
+async function renderFamilyChallenge() {
+  const box = $("#family-challenge");
+  if (!box || !studentId) return;
+  box.classList.add("hidden");
+  box.innerHTML = "";
+  try {
+    const res = await api(`/api/student/${studentId}/family-challenge`, null, "GET");
+    if (!res || !res.challenge) return;
+
+    const ch = res.challenge;
+    const title = escapeHtml(ch.title || window.I18n.t("family.title"));
+    const desc = escapeHtml(ch.description || "");
+    const xp = ch.xp_reward || 0;
+    const done = !!res.completed_this_week;
+    const xpTag = window.I18n.t("family.xpTag").replace("{xp}", xp);
+    const btnText = done ? window.I18n.t("family.doneState") : window.I18n.t("family.doneBtn");
+
+    box.innerHTML = `
+      <div class="history-date"><span>👨‍👩‍👧 ${escapeHtml(res.student_name || "")}</span><span>${xpTag}</span></div>
+      <div class="history-topic">${title}</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:10px;line-height:1.6;">${desc}</div>
+      <button id="js-family-done" class="btn-primary"${done ? " disabled" : ""} style="${done ? "opacity:.6;cursor:default;" : ""}">${btnText}</button>
+    `;
+    box.classList.remove("hidden");
+
+    if (!done) {
+      const btn = $("#js-family-done");
+      if (btn) btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        try {
+          const r = await api(`/api/student/${studentId}/family-challenge/complete`, {}, "POST");
+          let msg = (r && r.feedback) || "";
+          if (r && r.xp_gained) msg += " +" + r.xp_gained + " XP";
+          toast(msg);
+          renderFamilyChallenge();
+        } catch (e) {
+          btn.disabled = false;
+          toast((e && e.message) || window.I18n.t("problem.networkError"));
+        }
+      });
+    }
+  } catch (_) {
+    box.classList.add("hidden");
+    box.innerHTML = "";
+  }
+}
+
 // ---------------------------------------------------------------- 作品墙（I-11.3 作品展示）
 async function renderCreations() {
   const wrap = $("#creations-list");
   if (!wrap) return;
+  renderFamilyChallenge();
   try {
     const res = await api(`/api/creations/${studentId}`, null, "GET");
     if (!res.creations || !res.creations.length) {
