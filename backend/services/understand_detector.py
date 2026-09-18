@@ -327,3 +327,80 @@ def build_step_diagnostic(topic_name: str, steps: list[dict]) -> str:
         )
     lines.append("直接告诉我数字就行，比如「第2步」；如果都觉得会，就从第1步开始试～")
     return "\n".join(lines)
+
+
+# ===== L.2 LLM 兜底通道（规格：关键词规则优先 + LLM 判断兜底，命中任一即触发确认） =====
+# 规则未命中时，由 chat 层调用 LLM 判定孩子表达是否属于 8 类信号之一。
+# 解析函数 parse_llm_classify 为纯函数（无 LLM 依赖），可独立单测。
+
+# 给 LLM 的信号分类依据（与上方关键词词典同源的 8 类定义，供 LLM 对未命中表达做语义判定）
+_LLM_CLASSIFY_GUIDE = "\n".join([
+    "cant_do: 孩子说\"我不会\"\"做不来\"等，但表达较绕/具体，判定：概念不懂或题目没读懂或不知从何入手",
+    "text_confusion: 孩子说\"看不懂\"\"没读懂\"\"不理解\"(文字/题目层面)，判定：文字理解障碍",
+    "calc_wrong: 孩子说\"算出来不对\"\"答案不对\"\"这步错了\"，判定：计算/方法错误",
+    "method_conflict: 孩子说\"老师不是这么教的\"\"我们老师不是这样\"，判定：教学方法冲突",
+    "fake_understand: 孩子用很短的话表示懂了/敷衍（\"知道了\"\"哦\"\"嗯\"\"好\"），判定：假性理解/敷衍",
+    "metacognition_gap: 孩子表达出\"说不出自己卡在哪\"（\"反正不会\"\"就是不懂\"\"说不上来\"），判定：元认知不足",
+    "emotional_fatigue: 孩子表达烦躁/疲惫/抗拒（\"好烦\"\"不想做\"\"没心情\"），判定：情绪疲劳",
+    "claimed_understand: 孩子明确声称自己会了（\"我懂了\"\"我会了\"\"明白了\"），判定：真懂/假懂待验证",
+])
+
+LLM_CLASSIFY_PROMPT = (
+    "你是小圆助教（陪伴小学生学数学）的理解信号分类器。孩子可能用多种口语表达学习困难，"
+    "请把以下孩子说的话归类为 8 种理解信号之一。信号定义：\n"
+    + _LLM_CLASSIFY_GUIDE
+    + "\n\n要求：\n"
+    "1. 只能输出上述 8 类中恰好的一个信号名，或输出 none 表示不属于任何一类\n"
+    "2. 除非信号非常明确，否则倾向 none（宁可不打扰，也不误伤孩子）\n"
+    "3. 只需输出信号名，不要输出任何解释"
+)
+
+# LLM 兜底命中的置信度（低于规则命中——无关键词依据，仅为语义判断）
+LLM_FALLBACK_CONFIDENCE = 0.6
+
+# 信号名 → 建议消解动作（与 classify_utterance 返回一致，供 chat 层短路）
+_LLM_SIGNAL_ACTIONS: dict[str, str] = {
+    "cant_do": "confirm_question",
+    "text_confusion": "confirm_question",
+    "calc_wrong": "existing_flow",
+    "method_conflict": "confirm_question",
+    "fake_understand": "feynman_check",
+    "metacognition_gap": "show_steps",
+    "emotional_fatigue": "existing_flow",
+    "claimed_understand": "verify_variant",
+}
+
+
+def parse_llm_classify(text: str) -> UnderstandingSignal | None:
+    """解析 LLM 兜底输出为 UnderstandingSignal。
+
+    兼容 LLM 输出各种形态：纯信号名 / 带引号 / 带标点 / 多余解释 / 全大写。
+    解析失败或输出非法 → None（宁缺毋滥，由 persona 自然应对）。
+
+    Args:
+        text: LLM 原始输出
+
+    Returns:
+        合法信号（置信度 LLM_FALLBACK_CONFIDENCE）；否则 None。
+    """
+    raw = (text or "").strip()
+    if not raw:
+        return None
+    # 按行/逗号切分取出候选词，逐个清洗匹配
+    candidates = re.split(r"[\s,，。.!！?？;；]+", raw)
+    for cand in candidates:
+        word = cand.strip().strip("\"'`“”‘’")
+        word = word.lower()
+        word = re.sub(r"\W+", "", word)
+        if word == "none":
+            return None
+        if word in _LLM_SIGNAL_ACTIONS:
+            return UnderstandingSignal(
+                signal=word,  # type: ignore[arg-type]
+                confidence=LLM_FALLBACK_CONFIDENCE,
+                detail="LLM 兜底语义判定",
+                student_quote="",
+                matched_keyword="",
+                action=_LLM_SIGNAL_ACTIONS[word],
+            )
+    return None

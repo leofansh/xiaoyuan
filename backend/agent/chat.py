@@ -15,7 +15,9 @@ from backend.services import llm
 from backend.services.content_filter import filter_llm_output
 from backend.services.crisis import detect_crisis, crisis_intervention, record_crisis
 from backend.services.repetition import schedule_review, get_due_reviews
-from backend.services.teaching_journal import generate_insights, get_relevant_insights
+from backend.services.teaching_journal import (
+    generate_insights, get_relevant_insights, record_misunderstanding,
+)
 from backend.services.wellbeing import check_time_limit
 from backend.services.interest_extractor import extract_interests, personalized_opening
 from backend.services.storage import StudentStorage, get_storage
@@ -377,8 +379,12 @@ def _record_misunderstanding(
     student: Student, *, signal: str, detail: str, quote: str,
     resolution: str, resolved: bool, topic_id: str = "",
 ) -> None:
-    """记录假性理解 / 理解纠偏事件（规格 L.4，上限 50 条）。"""
-    student.misunderstanding_events.append({
+    """记录假性理解 / 理解纠偏事件（规格 L.4，上限 50 条）。
+
+    同步记入教学日志（TeachingInsight，规格 L.9 新增 misunderstanding 事件类型），
+    与 misunderstanding_events 详表双写。
+    """
+    event = {
         "date": datetime.now().isoformat(timespec="seconds"),
         "signal": signal,
         "detail": detail,
@@ -386,9 +392,45 @@ def _record_misunderstanding(
         "resolution": resolution,
         "resolved": resolved,
         "topic_id": topic_id,
-    })
+    }
+    student.misunderstanding_events.append(event)
     if len(student.misunderstanding_events) > 50:
         student.misunderstanding_events = student.misunderstanding_events[-50:]
+    record_misunderstanding(student, event)
+
+
+async def _llm_classify_fallback(student: Student, user_message: str):
+    """L.2 LLM 兜底通道：规则未命中时用 LLM 判断孩子表达是否属 8 类信号之一（规格 L.2 双通道）。
+
+    触发条件：非纯学习模式 + 教学节点 + 消息长度适中 + 配置了 API Key。
+    失败/超时/无 Key → 静默返回 None（由 persona 自然应对，绝不阻塞主流程）。
+
+    Returns:
+        UnderstandingSignal | None
+    """
+    from backend.config import get_api_key
+    from backend.services.understand_detector import (
+        LLM_CLASSIFY_PROMPT, parse_llm_classify,
+    )
+
+    msg = (user_message or "").strip()
+    # 消息过长/过短都不值得 LLM 兜底（过短多为语气词，过长是正常提问）
+    if not (2 <= len(msg) <= 60):
+        return None
+    if not get_api_key():
+        return None
+    sess = student.current_session
+    topic = sess.topic_id or ""
+    context = f"当前知识点：{topic or '（非特定知识点）'}"
+    try:
+        raw = await asyncio.wait_for(
+            llm.simple_chat(LLM_CLASSIFY_PROMPT, f"{context}\n孩子说的话：{msg}"),
+            timeout=6,
+        )
+    except Exception:
+        logger.info("L.2 LLM 兜底分类失败，静默降级（persona 自然应对）")
+        return None
+    return parse_llm_classify(raw)
 
 
 def _build_understand_short_reply(student: Student, sig) -> str:
@@ -756,6 +798,9 @@ async def process_message(
             _sig = classify_utterance(user_message or "")
         except ImportError:
             _sig = None
+        # L.2 LLM 兜底通道（规格：关键词规则优先 + LLM 判断兜底，命中任一即触发确认流程）
+        if _sig is None:
+            _sig = await _llm_classify_fallback(student, user_message or "")
         if _sig is not None:
             sess.current_understand_signal = _sig.signal
             # 防死循环：同一信号 2 轮内重复命中 → 不再短路，仅注入得体指令自然应对

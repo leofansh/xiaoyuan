@@ -149,6 +149,50 @@ def _analyze_style(student: Student, summary: SessionSummary) -> TeachingInsight
     return None
 
 
+def record_misunderstanding(student: Student, event: dict) -> None:
+    """把误解事件记入教学日志（规格 L.4/L.9：教学日志新增 misunderstanding 事件类型）。
+
+    与 student.misunderstanding_events（原话/判定/消解/结果）同步落账，
+    以 TeachingInsight(category="misunderstanding") 形式进入教学日志，
+    供 get_relevant_insights 后续参与 prompt 注入（priority 99，兜底生效）。
+
+    Args:
+        student: 学生对象
+        event: 误解事件 dict（date/signal/detail/quote/resolution/resolved/topic_id）
+    """
+    quote = event.get("quote", "")[:80] or "（无原话）"
+    signal = event.get("signal", "")
+    detail = event.get("detail", "")
+    resolution = event.get("resolution", "")
+    resolved = bool(event.get("resolved"))
+    resolution_label = resolution if resolution else "（无）"
+
+    insight = TeachingInsight(
+        date=(event.get("date") or datetime.now().isoformat(timespec="seconds"))[:10],
+        category="misunderstanding",
+        insight=(
+            f"孩子说「{quote}」，判定为{signal}（{detail}），"
+            f"消解动作：{resolution_label}，{'已解决' if resolved else '未解决'}"
+        ),
+        what_worked=resolution_label if resolved else "",
+        what_failed="" if resolved else "该误解尚未解决，下次遇到同类表达需换讲法",
+        student_style="",
+    )
+    student.teaching_journal.append(insight)
+    # 教学日志防膨胀：misunderstanding 类最多保留最近 30 条（保持原始顺序）
+    _trim_misunderstanding(student, keep=30)
+
+
+def _trim_misunderstanding(student: Student, keep: int = 30) -> None:
+    """教学日志中 misunderstanding 类保留最近 keep 条，其余类别不受影响。"""
+    journal = student.teaching_journal
+    mis_idx = [i for i, ins in enumerate(journal) if ins.category == "misunderstanding"]
+    if len(mis_idx) <= keep:
+        return
+    drop = set(mis_idx[:-keep])  # 丢弃最旧的超出部分
+    student.teaching_journal = [ins for i, ins in enumerate(journal) if i not in drop]
+
+
 def get_relevant_insights(student: Student, limit: int = 5) -> list[TeachingInsight]:
     """获取最近的相关教学洞察，用于注入system prompt。"""
     journal = student.teaching_journal
