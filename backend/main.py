@@ -1028,6 +1028,65 @@ async def cards_exchange(student_id: str, payload: CardExchangeRequest):
         return result
 
 
+class TwentyFourCheckRequest(BaseModel):
+    student_id: str
+    cards: list[int]
+    expression: str
+
+
+@app.get("/api/games/twenty-four/round")
+def twenty_four_round():
+    """24 点热身小游戏：随机生成一局有解的题目。"""
+    from backend.services.twenty_four import generate_round, solve
+
+    round_data = generate_round()
+    cards = round_data["cards"]
+    return {"cards": cards, "solution_count": len(solve(cards))}
+
+
+@app.post("/api/games/twenty-four/check")
+async def twenty_four_check(payload: TwentyFourCheckRequest):
+    """24 点热身小游戏：校验孩子提交的表达式，正确则奖励宠物 XP。"""
+    from backend.services.pet import add_xp, ensure_pet
+    from backend.services.twenty_four import check_expression
+
+    storage = get_storage()
+    lock = storage.get_lock(payload.student_id)
+    async with lock:
+        s = _load_student(payload.student_id)
+        result = check_expression(payload.cards, payload.expression)
+        if not result["correct"]:
+            return {"valid": result["valid"], "correct": False, "reason": result["reason"]}
+
+        now = datetime.now().isoformat(timespec="seconds")
+        s.creations.append({
+            "type": "twenty_four",
+            "cards": list(payload.cards),
+            "expression": payload.expression,
+            "created_at": now,
+        })
+
+        xp_gained = 0
+        pet_feed = None
+        if not config.get_pure_mode():
+            s.pet = ensure_pet(s.pet)
+            pet_feed = add_xp(s.pet, 10, source="twenty_four")
+            xp_gained = 10
+
+        storage.save(s)
+        return {
+            "valid": True,
+            "correct": True,
+            "xp_gained": xp_gained,
+            "pet_feed": {
+                k: pet_feed[k]
+                for k in ("xp_gained", "new_exp", "leveled_up", "new_level", "unlocked_skin")
+            } if pet_feed else None,
+            "reason": result["reason"],
+            "creations_count": len(s.creations),
+        }
+
+
 @app.get("/api/combo/{student_id}")
 def combo_get(student_id: str):
     """5.4 获取 Combo 状态。"""

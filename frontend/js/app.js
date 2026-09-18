@@ -863,6 +863,102 @@ async function renderCreations() {
   }
 }
 
+// ---------------------------------------------------------------- 小游戏：24点热身
+let twentyFourState = { cards: [], solution_count: 0 };
+
+async function renderTwentyFour() {
+  const wrap = $("#view-games");
+  if (!wrap) return;
+  wrap.innerHTML = `
+    <div class="games-panel" style="max-width:560px;margin:0 auto;padding:16px;">
+      <h3 class="section-title">${escapeHtml(window.I18n.t("games.title"))}</h3>
+      <p style="font-size:13px;color:var(--muted);margin:-6px 0 16px;">${escapeHtml(window.I18n.t("games.subtitle"))}</p>
+      <div id="twentyfour-cards" style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:14px;"></div>
+      <div id="twentyfour-solutions" style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:12px;"></div>
+      <div style="display:flex;gap:10px;margin-bottom:14px;">
+        <input id="twentyfour-input" type="text" autocomplete="off" placeholder="${escapeHtml(window.I18n.t("games.yourAnswer"))}" style="flex:1;border:1px solid #ddd;border-radius:12px;padding:12px;font-size:16px;font-family:inherit;">
+        <button id="twentyfour-submit" class="btn-primary">${escapeHtml(window.I18n.t("games.submit"))}</button>
+      </div>
+      <button id="twentyfour-new" class="btn-primary" style="width:100%;">${escapeHtml(window.I18n.t("games.newRound"))}</button>
+      <div id="twentyfour-result" style="margin-top:14px;text-align:center;font-size:14px;min-height:20px;"></div>
+    </div>
+  `;
+
+  $("#twentyfour-submit").onclick = submitTwentyFour;
+  $("#twentyfour-new").onclick = () => loadTwentyFourRound();
+  $("#twentyfour-input").addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); submitTwentyFour(); }
+  });
+
+  await loadTwentyFourRound();
+}
+
+async function loadTwentyFourRound() {
+  const cardsBox = $("#twentyfour-cards");
+  const solutions = $("#twentyfour-solutions");
+  const input = $("#twentyfour-input");
+  const result = $("#twentyfour-result");
+  if (cardsBox) cardsBox.innerHTML = "";
+  if (input) input.value = "";
+  if (result) result.textContent = "";
+  try {
+    const res = await api("/api/games/twenty-four/round", null, "GET");
+    twentyFourState = { cards: res.cards || [], solution_count: res.solution_count || 0 };
+    renderTwentyFourCards(twentyFourState.cards);
+    if (solutions) solutions.textContent = window.I18n.t("games.solutions").replace("{n}", twentyFourState.solution_count);
+  } catch (_) {
+    if (solutions) solutions.textContent = "";
+    if (result) result.textContent = window.I18n.t("games.error");
+  }
+}
+
+function renderTwentyFourCards(cards) {
+  const box = $("#twentyfour-cards");
+  if (!box) return;
+  box.innerHTML = "";
+  (cards || []).forEach(n => {
+    const card = document.createElement("div");
+    card.style.cssText =
+      "width:64px;height:84px;border-radius:14px;" +
+      "background:linear-gradient(135deg,#ffe3c2,#ffc58a);" +
+      "display:flex;align-items:center;justify-content:center;" +
+      "font-size:28px;font-weight:700;color:#7a4a12;box-shadow:0 4px 12px rgba(0,0,0,.12);";
+    card.textContent = n;
+    box.appendChild(card);
+  });
+}
+
+async function submitTwentyFour() {
+  const input = $("#twentyfour-input");
+  const result = $("#twentyfour-result");
+  const expression = (input ? input.value : "").trim();
+  if (!expression) {
+    if (result) result.textContent = window.I18n.t("games.yourAnswer");
+    return;
+  }
+  if (!twentyFourState.cards || !twentyFourState.cards.length) {
+    if (result) result.textContent = window.I18n.t("games.error");
+    return;
+  }
+  try {
+    const res = await api("/api/games/twenty-four/check", {
+      student_id: studentId,
+      cards: twentyFourState.cards,
+      expression,
+    }, "POST");
+    if (res.correct) {
+      if (result) result.textContent = window.I18n.t("games.correct");
+      toast(window.I18n.t("games.correct") + (res.xp_gained ? ` +${res.xp_gained} XP` : ""), 3000);
+    } else {
+      if (result) result.textContent = (res.reason && res.reason.trim())
+        ? res.reason
+        : window.I18n.t("games.wrong");
+    }
+  } catch (_) {
+    if (result) result.textContent = window.I18n.t("games.error");
+  }
+}
+
 async function sendChat() {
   const input = $("#chat-input");
   const text = input.value.trim();
@@ -1103,6 +1199,7 @@ $all(".tab").forEach(tab => {
     if (currentView === "cognitive") renderCognitiveProfile();
     if (currentView === "pbl") { if (window.PBLView) window.PBLView.loadInto("view-pbl"); }
     if (currentView === "creations") renderCreations();
+    if (currentView === "games") renderTwentyFour();
   };
 });
 

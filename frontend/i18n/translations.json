@@ -97,6 +97,7 @@
     "mastery.mastered": "已经掌握了",
     "mastery.new_gain": "又进步了一点！",
     "nav.creations": "🎨 我的作品",
+    "nav.games": "🎮 小游戏",
     "input.problem": "📝 出一道题",
     "creations.title": "🎨 我的作品",
     "creations.newProblem": "📝 出一道题",
@@ -119,7 +120,16 @@
     "problem.emptyError": "先把题目写出来嘛～",
     "problem.saved": "题目收进你的题库啦！",
     "problem.cardGot": "掉落了",
-    "problem.networkError": "网络开小差了，再试一次好吗？"
+    "problem.networkError": "网络开小差了，再试一次好吗？",
+    "games.title": "🎮 24点热身",
+    "games.subtitle": "用 + - × ÷ 和括号，把 4 张牌各用一次，算出 24！",
+    "games.yourAnswer": "你的算式",
+    "games.submit": "校验！",
+    "games.newRound": "换一组牌",
+    "games.solutions": "这题有 {n} 种解法",
+    "games.correct": "算出来啦！正是 24！",
+    "games.wrong": "再想想？还差一点～",
+    "games.error": "网络开小差了，再试一次"
   },
   
   "en": {
@@ -220,6 +230,7 @@
     "mastery.mastered": "Already mastered",
     "mastery.new_gain": "Getting better!",
     "nav.creations": "🎨 My Works",
+    "nav.games": "🎮 Games",
     "input.problem": "📝 Make a Problem",
     "creations.title": "🎨 My Works",
     "creations.newProblem": "📝 Make a Problem",
@@ -242,6 +253,15 @@
     "problem.emptyError": "Write your problem first~",
     "problem.saved": "Problem saved to your collection!",
     "problem.cardGot": "Dropped",
-    "problem.networkError": "Network hiccup. Try again?"
+    "problem.networkError": "Network hiccup. Try again?",
+    "games.title": "🎮 24-Point Warm-up",
+    "games.subtitle": "Use + - × ÷ and parentheses, use each card once, make 24!",
+    "games.yourAnswer": "Your expression",
+    "games.submit": "Check!",
+    "games.newRound": "New cards",
+    "games.solutions": "{n} solutions",
+    "games.correct": "You made 24!",
+    "games.wrong": "Not quite yet - try again!",
+    "games.error": "Network hiccup - try again"
   }
 }
