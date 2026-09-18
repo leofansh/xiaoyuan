@@ -1,0 +1,236 @@
+/* ============================================================
+   小圆助教 · 模块「🎵 音乐与数学」模拟器样式 (music.css)
+   颜色沿用 style.css 主题变量；.mus-* 前缀
+   ============================================================ */
+
+.mus-sim {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--bg2, #ebf4e3);
+  border-radius: 16px;
+  background: var(--bg1, #f7fbf3);
+  box-shadow: var(--soft-shadow, 0 6px 18px rgba(150, 187, 133, .28));
+}
+
+/* ---------------- 状态栏 ---------------- */
+.mus-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+.mus-attempts {
+  color: var(--muted, #97a78d);
+  font-weight: 600;
+}
+
+.mus-result {
+  color: var(--accent, #7ca26c);
+  font-weight: 700;
+}
+
+/* ---------------- 舞台区 ---------------- */
+.mus-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ---------------- 工具条 ---------------- */
+.mus-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  flex-wrap: wrap;
+}
+
+.mus-hint {
+  font-size: 12.5px;
+  color: var(--muted, #97a78d);
+  flex: 1 1 auto;
+  min-width: 160px;
+}
+
+.mus-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mus-audio-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ---------------- 按钮 ---------------- */
+.mus-btn {
+  border: 1px solid var(--main, #96bb85);
+  background: var(--chip-bg, #f2f8ec);
+  color: var(--chip-text, #77966a);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all .2s;
+  white-space: nowrap;
+}
+
+.mus-btn:hover {
+  border-color: var(--main-strong, #83ab72);
+  background: var(--bg2, #ebf4e3);
+  box-shadow: var(--soft-shadow, 0 6px 18px rgba(150, 187, 133, .28));
+}
+
+.mus-btn:active {
+  transform: translateY(1px);
+}
+
+.mus-btn-submit {
+  background: var(--accent, #7ca26c);
+  border-color: var(--accent, #7ca26c);
+  color: #fff;
+}
+
+.mus-btn-submit:hover {
+  background: var(--main-strong, #83ab72);
+  border-color: var(--main-strong, #83ab72);
+  color: #fff;
+}
+
+.mus-btn-help {
+  border-color: var(--accent, #7ca26c);
+  color: var(--accent, #7ca26c);
+}
+
+/* ---------------- 调色板（音符/音程/倍数） ---------------- */
+.mus-palette {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.mus-legend {
+  font-size: 12px;
+  color: var(--muted, #97a78d);
+  margin-right: 4px;
+}
+
+.mus-palette-btn {
+  border: 1px solid var(--main, #96bb85);
+  background: var(--chip-bg, #f2f8ec);
+  color: var(--chip-text, #77966a);
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 7px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: transform .15s, border-color .15s, background .15s;
+}
+
+.mus-palette-btn:hover {
+  border-color: var(--main-strong, #83ab72);
+  transform: scale(1.04);
+}
+
+.mus-palette-btn.active {
+  background: var(--accent, #7ca26c);
+  border-color: var(--accent, #7ca26c);
+  color: #fff;
+}
+
+/* ---------------- 音符网格 ---------------- */
+.mus-grid {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+}
+
+.mus-cell {
+  min-height: 44px;
+  border: 1px dashed var(--main, #96bb85);
+  background: transparent;
+  border-radius: 10px;
+  color: var(--text, #444);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+  font-variant-numeric: tabular-nums;
+}
+
+.mus-cell:hover {
+  border-color: var(--main-strong, #83ab72);
+  background: var(--bg2, #ebf4e3);
+}
+
+.mus-cell-on {
+  background: var(--accent, #7ca26c);
+  border-color: var(--accent, #7ca26c);
+  border-style: solid;
+  color: #fff;
+}
+
+/* ---------------- 步进输入（和弦声部） ---------------- */
+.mus-steppers {
+  display: flex;
+  gap: 12px 20px;
+  flex-wrap: wrap;
+}
+
+.mus-stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mus-step-name {
+  font-size: 13px;
+  color: var(--text, #444);
+  font-weight: 600;
+}
+
+.mus-step-btn {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--main, #96bb85);
+  background: var(--chip-bg, #f2f8ec);
+  color: var(--chip-text, #77966a);
+  font-size: 16px;
+  font-weight: 700;
+  border-radius: 8px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.mus-step-btn:hover {
+  background: var(--bg2, #ebf4e3);
+}
+
+.mus-step-val {
+  min-width: 2.4em;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent, #7ca26c);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------- 响应式 ---------------- */
+@media (max-width: 640px) {
+  .mus-sim { padding: 10px; }
+  .mus-status { flex-direction: column; align-items: flex-start; }
+  .mus-toolbar { align-items: stretch; flex-direction: column; }
+  .mus-actions { width: 100%; }
+  .mus-actions .mus-btn { flex: 1 1 auto; }
+  .mus-steppers { flex-direction: column; gap: 8px; }
+}

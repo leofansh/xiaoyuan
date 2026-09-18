@@ -1830,32 +1830,34 @@ initThemeUI();
 initProfile();
 initVoiceInput();
 
-// V3.0 P2 模块D/E/F：冒险地图 + PBL 视图初始化与导弹模拟器接线
+// V3.0 P2 模块D/E/F：冒险地图 + PBL 视图初始化与 PBL 模拟器接线
 if (window.AdventureView) window.AdventureView.init();
 if (window.CoCreation) window.CoCreation.init();
 if (window.PBLView) {
   window.PBLView.init();
-  if (window.MissileProject) {
+  if (window.PBLView.setSimulator) {
     window.PBLView.setSimulator((box, cfg) => {
       const lvl = (window.PBLView._levelData && window.PBLView._levelData.level) || {};
       const type = lvl.simulator_type || "missile_level1";
-      if (String(type).indexOf("building_") === 0) {
+      const t = String(type);
+      if (t.indexOf("building_") === 0) {
         if (window.BuildingProject) window.BuildingProject.mountSimulator(box, type, cfg);
-      } else {
+      } else if (t.indexOf("music_") === 0) {
+        if (window.MusicProject) window.MusicProject.mountSimulator(box, type, cfg);
+      } else if (t.indexOf("baking_") === 0) {
+        if (window.BakingProject) window.BakingProject.mountSimulator(box, type, cfg);
+      } else if (window.MissileProject) {
         window.MissileProject.mountSimulator(box, type, cfg);
       }
     });
-    window.MissileProject.setCompleteHandler(payload => {
-      if (window.PBLView.currentProjectId && window.PBLView.currentLevelId) {
-        window.PBLView.submitComplete(window.PBLView.currentProjectId, window.PBLView.currentLevelId, payload);
-      }
-    });
   }
-  if (window.BuildingProject) {
-    window.BuildingProject.setCompleteHandler(payload => {
-      if (window.PBLView.currentProjectId && window.PBLView.currentLevelId) {
-        window.PBLView.submitComplete(window.PBLView.currentProjectId, window.PBLView.currentLevelId, payload);
-      }
-    });
-  }
+  const submitPayload = payload => {
+    if (window.PBLView.currentProjectId && window.PBLView.currentLevelId) {
+      window.PBLView.submitComplete(window.PBLView.currentProjectId, window.PBLView.currentLevelId, payload);
+    }
+  };
+  if (window.MissileProject) window.MissileProject.setCompleteHandler(submitPayload);
+  if (window.BuildingProject) window.BuildingProject.setCompleteHandler(submitPayload);
+  if (window.MusicProject) window.MusicProject.setCompleteHandler(submitPayload);
+  if (window.BakingProject) window.BakingProject.setCompleteHandler(submitPayload);
 }

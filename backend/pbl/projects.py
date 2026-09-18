@@ -437,6 +437,376 @@ PBL_PROJECTS: dict[str, dict] = {
         "locked": False,
         "prerequisite_project": None,
     },
+    "music_math": {
+        "id": "music_math",
+        "name": "音乐与数学",
+        "icon": "🎵",
+        "description": "你是一名小小音乐家，用节拍、音程和音阶，把数学藏进好听的旋律里！",
+        "category": "音乐/艺术",
+        "interests": ["音乐", "艺术", "科学"],
+        "difficulty": "beginner",
+        "estimated_time": "2-4小时",
+        "knowledge_coverage": ["分数", "比例", "频率", "周期"],
+        "grade_range": "四~六年级",
+        "levels": [
+            {
+                "id": 1,
+                "name": "节拍小乐手",
+                "description": "跟着节拍器，把一个个音符按拍数填进小节里。",
+                "simulator_type": "music_level1",
+                "simulator_config": {
+                    "mode": "beat",
+                    "target_beats": 4,
+                    "note_pool": ["whole", "half", "quarter", "eighth"],
+                },
+                "completion_criteria": {"hit_target": True},
+                "rewards": {"xp": 30, "card": "card_elem_fenshu"},
+                "level_knowledge": [
+                    {
+                        "id": "elem_fenshu",
+                        "name": "分数运算",
+                        "explanation": (
+                            "全音符 4 拍、二分音符 2 拍、四分音符 1 拍——节拍的本质就是分数："
+                            "把 1 小节切成几份，就是在做分数的加减。"
+                        ),
+                    },
+                ],
+            },
+            {
+                "id": 2,
+                "name": "音程侦探",
+                "description": "纯五度音程的振动频率比是 3:2，找到正确的目标频率。",
+                "simulator_type": "music_level2",
+                "simulator_config": {
+                    "mode": "interval",
+                    "base_freq": 440,
+                    "target_ratio": "3:2",
+                },
+                "completion_criteria": {"hit_target": True},
+                "rewards": {"xp": 40, "card": "card_hist_fraction"},
+                "level_knowledge": [
+                    {
+                        "id": "elem_fenshu",
+                        "name": "分数运算",
+                        "explanation": (
+                            "纯五度的频率比是 3:2，也就是 3/2。把两个音的高低关系写成比例，"
+                            "再乘上基频就能得到目标频率。"
+                        ),
+                    },
+                ],
+            },
+            {
+                "id": 3,
+                "name": "和弦调音师",
+                "description": "大三和弦的振动频率比是 4:5:6，调出和谐的和弦。",
+                "simulator_type": "music_level3",
+                "simulator_config": {
+                    "mode": "chord",
+                    "base_freq": 440,
+                    "target_ratio": "4:5:6",
+                },
+                "completion_criteria": {"hit_target": True},
+                "rewards": {"xp": 50, "card": "card_elem_yinshu"},
+                "level_knowledge": [
+                    {
+                        "id": "elem_yinshu",
+                        "name": "因数与倍数",
+                        "explanation": (
+                            "大三和弦 4:5:6 三个数成比例，找它们的倍数关系，"
+                            "就能让三个音一起变高而不走音。"
+                        ),
+                    },
+                ],
+            },
+            {
+                "id": 4,
+                "name": "八度魔法师",
+                "description": "把一个音高翻倍（×2），就升高了一个八度，练出高八度音阶。",
+                "simulator_type": "music_level4",
+                "simulator_config": {
+                    "mode": "scale",
+                    "notes": ["C", "D", "E", "F", "G", "A", "B"],
+                    "period_multiplier": 2,
+                },
+                "completion_criteria": {"hit_target": True},
+                "rewards": {"xp": 60, "card": "card_6a_chengfang"},
+                "level_knowledge": [
+                    {
+                        "id": "6a_chengfang",
+                        "name": "有理数乘方",
+                        "explanation": (
+                            "音高翻倍（×2）就升高一个八度，再翻倍又升一个八度——"
+                            "连续翻倍正是乘方的意思（2¹、2²、2³）。"
+                        ),
+                    },
+                ],
+            },
+            {
+                "id": 5,
+                "name": "节奏作曲家",
+                "description": "4/4 拍里自由编排节奏，把每个小节都填满 4 拍。",
+                "simulator_type": "music_level5",
+                "simulator_config": {
+                    "mode": "rhythm_compose",
+                    "measure_beats": 4,
+                },
+                "completion_criteria": {"hit_target": True},
+                "rewards": {"xp": 80, "card": "card_thinking_visual"},
+                "level_knowledge": [
+                    {
+                        "id": "elem_fenshu",
+                        "name": "分数运算",
+                        "explanation": (
+                            "4/4 拍表示每小节 4 拍、四分音符为 1 拍。"
+                            "把不同时值的音符填满 4 拍，就是分数凑整。"
+                        ),
+                    },
+                ],
+            },
+            {
+                "id": 6,
+                "name": "音乐总指挥",
+                "description": "自由创作！把学到的节拍、音程、和弦、音阶组合成一段旋律。",
+                "simulator_type": "music_level6",
+                "simulator_config": {},
+                "completion_criteria": {"hit_target": True},
+                "rewards": {"xp": 120, "card": "card_thinking_modeling"},
+                "level_knowledge": [
+                    {
+                        "id": "elem_sifasuan",
+                        "name": "四则运算",
+                        "explanation": (
+                            "自由作曲要把各音符的拍数加加减减凑满每一小节，"
+                            "这正是四则运算的综合运用。"
+                        ),
+                    },
+                ],
+            },
+        ],
+        "choices": [
+            {
+                "id": "lv3_music_choice",
+                "at_level": 3,
+                "prompt": "音乐会马上开场了，你想先练哪种本领？",
+                "options": [
+                    {
+                        "id": "scale_first",
+                        "label": "先练音阶翻倍（频率）",
+                        "hint": "把每个音的音高翻倍，高八度就在手边",
+                        "focus": "scale",
+                    },
+                    {
+                        "id": "rhythm_first",
+                        "label": "先练节奏编曲（拍号）",
+                        "hint": "4/4 拍里填满音符，节奏感最重要",
+                        "focus": "rhythm",
+                    },
+                    {
+                        "id": "interval_first",
+                        "label": "再磨磨音程耳朵（比例）",
+                        "hint": "3:2 的纯五度，练出好听力",
+                        "focus": "interval",
+                    },
+                ],
+            },
+        ],
+        "locked": False,
+        "prerequisite_project": None,
+    },
+    "baking_lab": {
+        "id": "baking_lab",
+        "name": "烘焙实验室",
+        "icon": "🍰",
+        "description": "你是一名甜品烘焙师，用比例、方程和单位换算，烤出香甜的蛋糕和饼干！",
+        "category": "美食/烘焙",
+        "interests": ["美食", "烘焙", "创造"],
+        "difficulty": "beginner",
+        "estimated_time": "2-4小时",
+        "knowledge_coverage": ["比例", "方程", "单位换算", "时间"],
+        "grade_range": "四~八年级",
+        "levels": [
+            {
+                "id": 1,
+                "name": "配方换算师",
+                "description": "把 4 人份的配方换算成 6 人份，每种食材都要按比例调整。",
+                "simulator_type": "baking_level1",
+                "simulator_config": {
+                    "mode": "recipe_scale",
+                    "from_servings": 4,
+                    "to_servings": 6,
+                    "ingredients": [
+                        {"name": "面粉", "amount": 200, "unit": "g"},
+                        {"name": "糖", "amount": 100, "unit": "g"},
+                        {"name": "黄油", "amount": 80, "unit": "g"},
+                        {"name": "鸡蛋", "amount": 2, "unit": "个"},
+                        {"name": "牛奶", "amount": 120, "unit": "ml"},
+                    ],
+                },
+                "completion_criteria": {"hit_target": True},
+                "rewards": {"xp": 30, "card": "card_elem_yinshu"},
+                "level_knowledge": [
+                    {
+                        "id": "elem_yinshu",
+                        "name": "因数与倍数",
+                        "explanation": (
+                            "4 人份改成 6 人份就是 ×(6/4)=×1.5，每种食材都乘同一个倍数。"
+                            "找对倍数，配方才不会失衡。"
+                        ),
+                    },
+                ],
+            },
+            {
+                "id": 2,
+                "name": "翻倍小能手",
+                "description": "把配方整体翻倍，做出双份香草蛋糕。",
+                "simulator_type": "baking_level2",
+                "simulator_config": {
+                    "mode": "doubling",
+                    "factor": 2,
+                    "ingredients": [
+                        {"name": "面粉", "amount": 200, "unit": "g"},
+                        {"name": "糖", "amount": 100, "unit": "g"},
+                        {"name": "黄油", "amount": 80, "unit": "g"},
+                        {"name": "鸡蛋", "amount": 2, "unit": "个"},
+                        {"name": "牛奶", "amount": 120, "unit": "ml"},
+                    ],
+                },
+                "completion_criteria": {"hit_target": True},
+                "rewards": {"xp": 40, "card": "card_elem_sifasuan"},
+                "level_knowledge": [
+                    {
+                        "id": "elem_sifasuan",
+                        "name": "四则运算",
+                        "explanation": (
+                            "把配方翻倍，就是每种食材都 ×2。乘法最擅长做翻倍，"
+                            "漏乘一种食材整锅就变味啦。"
+                        ),
+                    },
+                ],
+            },
+            {
+                "id": 3,
+                "name": "温控烘焙师",
+                "description": "烤箱该用多少度？调出最合适的烘烤温度。",
+                "simulator_type": "baking_level3",
+                "simulator_config": {
+                    "mode": "temperature",
+                    "temps": [150, 160, 170, 175, 180, 190],
+                    "target": 175,
+                },
+                "completion_criteria": {"hit_target": True},
+                "rewards": {"xp": 50, "card": "card_elem_xiaoshu"},
+                "level_knowledge": [
+                    {
+                        "id": "elem_xiaoshu",
+                        "name": "小数运算",
+                        "explanation": (
+                            "华氏 F = 摄氏 C × 9/5 + 32。温度换算里有分数和小数，"
+                            "烤温差几度口感就差很多。"
+                        ),
+                    },
+                ],
+            },
+            {
+                "id": 4,
+                "name": "时间管理师",
+                "description": "把总时长拆成和面、发酵、烘烤几段，合理安排烘烤时间。",
+                "simulator_type": "baking_level4",
+                "simulator_config": {
+                    "mode": "time",
+                    "total_minutes": 90,
+                    "segments": [
+                        {"name": "和面", "minutes": 20},
+                        {"name": "发酵", "minutes": 40},
+                        {"name": "烘烤", "minutes": 30},
+                    ],
+                },
+                "completion_criteria": {"hit_target": True},
+                "rewards": {"xp": 60, "card": "card_thinking_decomp"},
+                "level_knowledge": [
+                    {
+                        "id": "elem_sifasuan",
+                        "name": "四则运算",
+                        "explanation": (
+                            "总时长 = 各段之和，90 分钟 = 1.5 小时。"
+                            "把时间拆成几段再相加，是单位换算加四则运算。"
+                        ),
+                    },
+                ],
+            },
+            {
+                "id": 5,
+                "name": "派对甜点师",
+                "description": "为派对准备甜点：每人几块 × 多少人 = 一共要做多少？",
+                "simulator_type": "baking_level5",
+                "simulator_config": {
+                    "mode": "party_plan",
+                    "per_person": 3,
+                    "target_people": 12,
+                },
+                "completion_criteria": {"hit_target": True},
+                "rewards": {"xp": 80, "card": "card_elem_fangcheng"},
+                "level_knowledge": [
+                    {
+                        "id": "elem_fangcheng",
+                        "name": "简易方程",
+                        "explanation": (
+                            "人均 × 人数 = 总量：3 块 × 12 人 = 36 块。"
+                            "把总量设成未知数 x，列个方程就能解出来。"
+                        ),
+                    },
+                ],
+            },
+            {
+                "id": 6,
+                "name": "甜品发明家",
+                "description": "自由创造！用你学会的配方知识，发明一道独一无二的甜点。",
+                "simulator_type": "baking_level6",
+                "simulator_config": {},
+                "completion_criteria": {"hit_target": True},
+                "rewards": {"xp": 120, "card": "card_thinking_modeling"},
+                "level_knowledge": [
+                    {
+                        "id": "elem_sifasuan",
+                        "name": "四则运算",
+                        "explanation": (
+                            "发明甜点要算配方比例、温度和时间，比例是分数、分量是乘法——"
+                            "全是四则运算的大集合。"
+                        ),
+                    },
+                ],
+            },
+        ],
+        "choices": [
+            {
+                "id": "lv4_bake_choice",
+                "at_level": 4,
+                "prompt": "烤箱预热好了，接下来你想挑战哪道甜点？",
+                "options": [
+                    {
+                        "id": "party_first",
+                        "label": "先办生日派对（按人数备料）",
+                        "hint": "人均 × 人数 = 总量，派对不愁不够分",
+                        "focus": "party",
+                    },
+                    {
+                        "id": "time_first",
+                        "label": "先练时间管理（分段计时）",
+                        "hint": "把总时长拆成几段，烤出完美口感",
+                        "focus": "time",
+                    },
+                    {
+                        "id": "temp_first",
+                        "label": "再研究温度换算（摄氏度）",
+                        "hint": "175°C 换算华氏，烤温不翻车",
+                        "focus": "temperature",
+                    },
+                ],
+            },
+        ],
+        "locked": False,
+        "prerequisite_project": None,
+    },
 }
 
 

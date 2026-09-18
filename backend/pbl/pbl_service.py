@@ -368,7 +368,7 @@ def complete_level(student, project_id: str, level_id: int,
             "completed": False,
             "stars_earned": 0,
             "rewards": None,
-            "message": "差一点！再试试调整力度和角度，导弹离靶子就差一点点啦！",
+            "message": "差一点！再试试调整参数，你离成功就差一点点啦！",
         }
 
     stars = _stars(True, attempts)
@@ -457,5 +457,6 @@ def project_knowledge(student, project_id: str, level_id: int) -> dict:
         })
 
     names = [p["name"] for p in points]
-    summary = "你刚才通过调整角度和力度打中了靶子，用到了：" + "、".join(names) + "。" if names else ""
+    level_name = level.get("name", f"Lv.{level_id}")
+    summary = f"你刚刚完成了「{level_name}」，用到了：" + "、".join(names) + "。" if names else f"你刚刚完成了「{level_name}」。"
     return {"level_id": level_id, "knowledge_points": points, "summary": summary}

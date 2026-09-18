@@ -1,0 +1,421 @@
+/* ============================================================
+   小圆助教 · 模块「🍰 烘焙实验室」模拟器样式 (baking.css)
+   颜色沿用 style.css 主题变量（var(--bg1)/var(--bg2)/var(--accent)/var(--muted) 等）
+   ============================================================ */
+
+.bake-sim {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--bg2, #ebf4e3);
+  border-radius: 16px;
+  background: var(--bg1, #f7fbf3);
+  box-shadow: var(--soft-shadow, 0 6px 18px rgba(150, 187, 133, .28));
+}
+
+/* ---------------- 标题 / 引导 ---------------- */
+.bake-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent, #7ca26c);
+}
+
+.bake-hint {
+  font-size: 12.5px;
+  color: var(--muted, #97a78d);
+  line-height: 1.5;
+}
+
+/* ---------------- 状态栏 ---------------- */
+.bake-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+.bake-attempts {
+  color: var(--muted, #97a78d);
+  font-weight: 600;
+}
+
+.bake-result {
+  color: var(--accent, #7ca26c);
+  font-weight: 700;
+}
+
+/* ---------------- 材料行（配方换算 / 倍增 / 派对） ---------------- */
+.bake-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.bake-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bake-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.bake-ing {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text, #444);
+}
+
+.bake-ing-emoji {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.bake-ref {
+  font-size: 12px;
+  color: var(--muted, #97a78d);
+}
+
+.bake-row-body {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bake-slider {
+  flex: 1;
+  min-width: 90px;
+  accent-color: var(--main, #96bb85);
+  cursor: pointer;
+}
+
+.bake-num {
+  width: 5.5em;
+  padding: 6px 8px;
+  border: 1px solid var(--main, #96bb85);
+  border-radius: 10px;
+  background: var(--chip-bg, #f2f8ec);
+  color: var(--text, #444);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.bake-num:focus {
+  outline: none;
+  border-color: var(--main-strong, #83ab72);
+  box-shadow: 0 0 0 3px rgba(150, 187, 133, .22);
+}
+
+.bake-unit {
+  flex-shrink: 0;
+  font-size: 12.5px;
+  color: var(--muted, #97a78d);
+}
+
+/* ---------------- 可视化填充条 ---------------- */
+.bake-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg2, #ebf4e3);
+  overflow: hidden;
+}
+
+.bake-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--main, #96bb85), var(--accent, #7ca26c));
+  transition: width .18s ease;
+}
+
+/* ---------------- 温度换算 ---------------- */
+.bake-temp-guide {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bake-temp-ref {
+  font-size: 12px;
+  color: var(--muted, #97a78d);
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--chip-bg, #f2f8ec);
+}
+
+.bake-temp-wrap {
+  display: flex;
+  gap: 18px;
+  align-items: stretch;
+}
+
+.bake-thermo {
+  position: relative;
+  width: 34px;
+  min-height: 180px;
+  border-radius: 999px;
+  background: var(--bg2, #ebf4e3);
+  border: 1px solid var(--bg2, #ebf4e3);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.bake-thermo-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 0%;
+  background: linear-gradient(180deg, #ff9e6d, #ef5a3c);
+  transition: height .2s ease;
+}
+
+.bake-thermo-bulb {
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  transform: translateX(-50%);
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ef5a3c;
+  box-shadow: 0 0 0 3px var(--bg1, #f7fbf3);
+}
+
+.bake-temp-input {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  justify-content: center;
+}
+
+.bake-temp-label {
+  font-size: 13px;
+  color: var(--text, #444);
+}
+
+.bake-temp-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bake-temp-num {
+  width: 6em;
+  font-size: 18px;
+}
+
+.bake-temp-readout {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent, #7ca26c);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------- 时间分配 ---------------- */
+.bake-timers {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bake-timer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bake-timer-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.bake-timer-val {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--accent, #7ca26c);
+  font-variant-numeric: tabular-nums;
+}
+
+.bake-timer-body {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bake-timer-track {
+  background: var(--bg2, #ebf4e3);
+}
+
+.bake-timer-track .bake-fill {
+  background: linear-gradient(90deg, #7ad0ff, #4b8be1);
+}
+
+.bake-time-total {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text, #444);
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--chip-bg, #f2f8ec);
+  text-align: center;
+}
+
+.bake-time-total.bake-time-over {
+  color: #d05a4f;
+}
+
+/* ---------------- 自由烘焙 ---------------- */
+.bake-free {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bake-name-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bake-name-label {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text, #444);
+}
+
+.bake-name {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--main, #96bb85);
+  border-radius: 10px;
+  background: var(--chip-bg, #f2f8ec);
+  color: var(--text, #444);
+  font-size: 14px;
+}
+
+.bake-name:focus {
+  outline: none;
+  border-color: var(--main-strong, #83ab72);
+  box-shadow: 0 0 0 3px rgba(150, 187, 133, .22);
+}
+
+.bake-free-ing-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 8px;
+}
+
+.bake-free-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--chip-bg, #f2f8ec);
+}
+
+.bake-free-ing {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text, #444);
+  white-space: nowrap;
+}
+
+.bake-free-row .bake-num {
+  width: 4.5em;
+}
+
+.bake-free-hint {
+  font-size: 12px;
+  color: var(--muted, #97a78d);
+}
+
+/* ---------------- 工具条 / 按钮 ---------------- */
+.bake-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px 16px;
+  flex-wrap: wrap;
+}
+
+.bake-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bake-btn {
+  border: 1px solid var(--main, #96bb85);
+  background: var(--chip-bg, #f2f8ec);
+  color: var(--chip-text, #77966a);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all .2s;
+  white-space: nowrap;
+}
+
+.bake-btn:hover {
+  border-color: var(--main-strong, #83ab72);
+  background: var(--bg2, #ebf4e3);
+  box-shadow: var(--soft-shadow, 0 6px 18px rgba(150, 187, 133, .28));
+}
+
+.bake-btn:active {
+  transform: translateY(1px);
+}
+
+.bake-btn-submit {
+  background: var(--accent, #7ca26c);
+  border-color: var(--accent, #7ca26c);
+  color: #fff;
+}
+
+.bake-btn-submit:hover {
+  background: var(--main-strong, #83ab72);
+  border-color: var(--main-strong, #83ab72);
+  color: #fff;
+}
+
+.bake-btn-help {
+  border-color: var(--accent, #7ca26c);
+  color: var(--accent, #7ca26c);
+}
+
+/* ---------------- 响应式 ---------------- */
+@media (max-width: 640px) {
+  .bake-sim { padding: 10px; }
+  .bake-status { flex-direction: column; align-items: flex-start; }
+  .bake-toolbar { align-items: stretch; }
+  .bake-actions { width: 100%; }
+  .bake-actions .bake-btn { flex: 1 1 auto; }
+  .bake-free-ing-list { grid-template-columns: 1fr 1fr; }
+  .bake-temp-wrap { gap: 12px; }
+  .bake-thermo { min-height: 140px; }
+}
