@@ -219,6 +219,38 @@ def set_card_drop_rates(rates: dict) -> dict[str, float]:
     return normalized
 
 
+DEFAULT_AB_TEST = {"enabled": False, "variant_a_ratio": 0.5}
+
+
+def _normalize_ab_test(raw) -> dict:
+    """对 A/B 测试配置逐 key 白名单规范化：非法/越界回退默认，缺 key 用默认。"""
+    if not isinstance(raw, dict):
+        raw = {}
+    enabled = bool(raw.get("enabled", DEFAULT_AB_TEST["enabled"]))
+    ratio = raw.get("variant_a_ratio", DEFAULT_AB_TEST["variant_a_ratio"])
+    if not isinstance(ratio, (int, float)) or not (0.0 < ratio < 1.0):
+        ratio = DEFAULT_AB_TEST["variant_a_ratio"]
+    return {"enabled": enabled, "variant_a_ratio": float(ratio)}
+
+
+def get_ab_test_config() -> dict:
+    """设计方案 98：读取 A/B 测试配置（运行时配置优先，缺省用默认值）。"""
+    rc = _load_runtime_config()
+    raw = rc.get("ab_test")
+    if not isinstance(raw, dict):
+        return dict(DEFAULT_AB_TEST)
+    return _normalize_ab_test(raw)
+
+
+def set_ab_test_config(value: dict) -> dict:
+    """设计方案 98：保存 A/B 测试配置，返回规范化后的 dict。"""
+    normalized = _normalize_ab_test(value)
+    rc = _load_runtime_config()
+    rc["ab_test"] = normalized
+    _save_runtime_config(rc)
+    return normalized
+
+
 DEFAULT_VARIABLE_REWARDS = {
     "pet_event_prob": 0.05,
     "pet_event_daily_max": 1,

@@ -53,6 +53,7 @@ class StudentCreate(BaseModel):
 class SessionStart(BaseModel):
     student_id: str
     mood: str = "😐"
+    source: str = "主动打开"  # 会话入口来源（可选，用于 A/B 测试主动打开率统计）
 
 
 class ModeSelect(BaseModel):
@@ -432,7 +433,7 @@ async def session_start(payload: SessionStart):
     lock = storage.get_lock(payload.student_id)
     async with lock:
         s = _load_student(payload.student_id)
-        info = agent_chat.start_session(s, payload.mood)
+        info = agent_chat.start_session(s, payload.mood, payload.source)
         storage.save(s)
         return info
 
@@ -573,6 +574,22 @@ async def session_end_beacon(student_id: str = ""):
         except HTTPException:
             pass
         return {"ok": True}
+
+
+@app.get("/api/ab-test/report")
+def ab_test_report():
+    """A/B 测试报告：聚合两组学习时长/完成率/主动打开率（不含学生身份与记录明细）。"""
+    from backend.services.ab_testing import compute_ab_report
+    storage = get_storage()
+    students = []
+    for p in config.STUDENTS_DIR.glob("stu_*.json"):
+        try:
+            s = storage.load(p.stem)
+            if s is not None:
+                students.append(s)
+        except Exception:  # noqa: BLE001  损坏/无法解析的档案文件跳过
+            continue
+    return compute_ab_report(students)
 
 
 @app.get("/api/knowledge/tree")

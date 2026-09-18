@@ -22,6 +22,7 @@ from backend.services.teaching_journal import (
 from backend.services.wellbeing import check_time_limit
 from backend.services.interest_extractor import extract_interests, personalized_opening
 from backend.services.storage import StudentStorage, get_storage
+from backend.services.ab_testing import get_ab_test_group
 
 
 # 规格 12.4.5#2：内在动机过渡机制话术（常量放 chat.py，不放 persona.py）
@@ -35,8 +36,11 @@ _INTRINSIC_POSITIVE_FEEDBACK = [
 ]
 
 
-def start_session(student: Student, mood: str) -> dict:
-    """开始新会话：记录心情，生成开场白与模式建议。"""
+def start_session(student: Student, mood: str, source: str = "主动打开") -> dict:
+    """开始新会话：记录心情，生成开场白与模式建议。
+
+    source：会话入口来源（"主动打开"/被动提醒等），用于 A/B 测试的主动打开率统计。
+    """
     # 会话开始时先应用遗忘衰减 + 认知画像衰减（B3）
     assessment.apply_forgetting_decay(student)
     from backend.agent.cognitive_assessment import apply_cognitive_decay
@@ -62,35 +66,19 @@ def start_session(student: Student, mood: str) -> dict:
 
     get_storage().add_mood(student, mood)
 
-    suggestion = {"😊": "A", "😐": "A或B", "😣": "B"}.get(mood, "A")
-    # V-P1-4：使用个性化开场白（引用学生兴趣）
-    opening = personalized_opening(mood, student)
-    # V3.0 P0: 轻量首学模式标记 + 兴趣问题（纯学习模式下关闭娱乐化功能）
+    # V3.0 P0: 轻量首学模式标记（纯学习模式下关闭娱乐化功能）
     pure_mode = get_pure_mode()
-    if not pure_mode:
-        if not student.session_history or student.total_sessions == 0:
-            sess.lightweight_mode = True
-        # V3.0 P0: 从兴趣引出第一个数学问题
-        if student.interests:
-            try:
-                from backend.services.interest_extractor import get_opening_problem
-                opening_problem = get_opening_problem(student.interests[0])
-                if opening_problem:
-                    opening += f"\n\n对了，我有个有趣的问题想请教你：{opening_problem}"
-            except ImportError:
-                pass
-        # V3.0 P2/I-11.7：连续剧情铺垫（昨天学会的技巧今天派上用场，规格 11.7）
-        _prelude = _yesterday_prelude(student)
-        if _prelude:
-            opening = f"{_prelude}\n\n{opening}"
-        # V3.0 P2/I-11.5：开场好奇心钩子（悬念化开局，铺垫当天主题）
-        try:
-            from backend.agent.persona import pick_opening_hook
-            hook = pick_opening_hook()
-            if hook:
-                opening = f"✨ {hook}\n\n{opening}"
-        except ImportError:
-            pass
+    if not pure_mode and (not student.session_history or student.total_sessions == 0):
+        sess.lightweight_mode = True
+
+    # 设计方案 98：A/B 测试——确定性分组 + 记录会话入口来源/分组
+    group = get_ab_test_group(student)
+    sess.entry_source = source
+    sess.ab_group = group
+
+    suggestion = {"😊": "A", "😐": "A或B", "😣": "B"}.get(mood, "A")
+    # 组 A=兴趣引入开场（现状默认），组 B=传统开场（仅基础问候）
+    opening = _opening_for_group(mood, student, group, pure_mode)
     if student.week_baseline_count >= 4:
         opening += "（悄悄说：这周我们都在充电呀，明天状态好的话来个小挑战？）"
 
@@ -169,6 +157,44 @@ def start_session(student: Student, mood: str) -> dict:
         # L.4.1：标记本次开场是否带延迟验证（前端可据此弱化复习提示）
         "delayed_check": bool(sess.delayed_check_topic_id),
     }
+
+
+def _opening_for_group(mood: str, student: Student, group: str, pure_mode: bool) -> str:
+    """按 A/B 测试组生成开场白（设计方案 98）。
+
+    组 A（含 ab_test 未启用时 group=""，保持现状）：兴趣引入开场
+    （个性化开场白 + 兴趣题 + 剧情铺垫 + 好奇心钩子）。
+    组 B：传统开场，仅 OPENING_BY_MOOD 基础问候，不注入兴趣题/兴趣开场白/额外钩子。
+    """
+    from backend.agent.persona import OPENING_BY_MOOD
+    if group == "B":
+        return OPENING_BY_MOOD.get(mood, OPENING_BY_MOOD["😐"])
+
+    # 组 A / 现状：个性化开场白（引用学生兴趣）
+    opening = personalized_opening(mood, student)
+    if not pure_mode:
+        # 从兴趣引出第一个数学问题
+        if student.interests:
+            try:
+                from backend.services.interest_extractor import get_opening_problem
+                opening_problem = get_opening_problem(student.interests[0])
+                if opening_problem:
+                    opening += f"\n\n对了，我有个有趣的问题想请教你：{opening_problem}"
+            except ImportError:
+                pass
+        # 连续剧情铺垫（昨天学会的技巧今天派上用场，规格 11.7）
+        _prelude = _yesterday_prelude(student)
+        if _prelude:
+            opening = f"{_prelude}\n\n{opening}"
+        # 开场好奇心钩子（悬念化开局，铺垫当天主题）
+        try:
+            from backend.agent.persona import pick_opening_hook
+            hook = pick_opening_hook()
+            if hook:
+                opening = f"✨ {hook}\n\n{opening}"
+        except ImportError:
+            pass
+    return opening
 
 
 def select_mode(student: Student, mode: str) -> None:
@@ -1351,6 +1377,8 @@ def end_session(student: Student) -> dict:
         blind_spots=list(student.current_session.blind_spots_today),
         new_badges=list(new_badges),
         duration_minutes=duration,
+        entry_source=student.current_session.entry_source,
+        ab_group=student.current_session.ab_group,
         messages=list(student.current_session.history),
     )
     student.session_history.append(summary_record)

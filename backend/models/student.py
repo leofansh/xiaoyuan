@@ -33,6 +33,8 @@ class SessionState(BaseModel):
     mode: Literal["A", "B", "weekend"] | None = None
     state: str = "GREETING"  # 状态机当前节点
     started_at: str = ""
+    entry_source: str = "主动打开"  # 会话入口来源（主动打开/被动提醒等）
+    ab_group: str = ""              # 本会话所属 A/B 测试组（"A"/"B"/""）
     topic_id: str = ""
     history: list[dict[str, str]] = Field(default_factory=list)  # [{role, content}]
     turn_count: int = 0
@@ -80,6 +82,8 @@ class SessionSummary(BaseModel):
     blind_spots: list[str] = Field(default_factory=list)
     new_badges: list[str] = Field(default_factory=list)
     duration_minutes: int = 0
+    entry_source: str = "主动打开"  # 会话入口来源（主动打开/被动提醒等）
+    ab_group: str = ""              # 本会话所属 A/B 测试组（"A"/"B"/""）
     messages: list[dict[str, str]] = Field(default_factory=list)  # [{role, content}]
 
 
@@ -184,6 +188,7 @@ class Student(BaseModel):
     textbook: str = "沪教版五四制2024"
     created_at: str = ""
     last_active: str = ""
+    ab_test_group: str = ""  # A/B 测试分组（"A"/"B"/""，enabled 时惰性分配并持久化）
 
     mastery: dict[str, MasteryRecord] = Field(default_factory=dict)  # {知识点id: MasteryRecord}
     gaps: list[Gap] = Field(default_factory=list)
