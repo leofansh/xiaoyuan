@@ -626,9 +626,9 @@ async def process_message(
         }
         return
 
-    # V3.0 模块 L：UNDER_CONFIRM 状态——费曼复述 / 台阶选择答语处理（纯规则短路）
+    # V3.0 模块 L：UNDERSTAND_CONFIRM 状态——费曼复述 / 台阶选择答语处理（纯规则短路）
     _uc_resumed_llm = False  # 本回答已由确认流程消费（如"选第N步"），本轮不再做信号检测
-    if not pure_mode and sess.state == "UNDER_CONFIRM":
+    if not pure_mode and sess.state == "UNDERSTAND_CONFIRM":
         _uc_reply = _handle_understand_confirm_answer(student, user_message)
         if _uc_reply:
             sess.history.append({"role": "user", "content": user_message})
@@ -748,7 +748,7 @@ async def process_message(
 
     # ---- V3.0 模块 L：双向有效交流——理解信号检测与处理（纯规则，纯学习模式关闭）----
     # 孩子在教学节点表达模糊（"我不会""知道了""看不懂"等），先按信号短路确认，
-    # 不进 LLM（规格 L.2/L.3/L.4）。UNDER_CONFIRM 状态在函数头部已消费，这里不会重复。
+    # 不进 LLM（规格 L.2/L.3/L.4）。UNDERSTAND_CONFIRM 状态在函数头部已消费，这里不会重复。
     understand_extra = ""
     if not pure_mode and not _uc_resumed_llm and sess.state not in ("MODE_SELECT", "GREETING", "BLIND_SPOT", "UNDERSTAND_CONFIRM"):
         try:
@@ -824,7 +824,7 @@ async def process_message(
     # V3.0 模块 L：理解信号对症指令（非短路路径：变式验证/方法冲突/重复表达）
     if understand_extra:
         extras.append(understand_extra)
-    # V3.0 模块 L：UNDER_CONFIRM 确认流程遗留的待执行指令（如"换讲法""只讲第N步"）
+    # V3.0 模块 L：UNDERSTAND_CONFIRM 确认流程遗留的待执行指令（如"换讲法""只讲第N步"）
     if sess.understand_pending_instruction:
         extras.append(sess.understand_pending_instruction)
         sess.understand_pending_instruction = ""
