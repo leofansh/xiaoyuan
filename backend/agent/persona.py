@@ -407,7 +407,7 @@ def build_system_prompt(student: Student) -> str:
         )
 
         # C3：兴趣 → 数学情境（当前知识点匹配时注入具体情境）
-        from backend.services.interest_extractor import get_math_context_for_interest
+        from backend.services.interest_extractor import get_math_context_for_interest, get_topic_templates
 
         topic_name = ""
         if student.current_session.topic_id:
@@ -424,6 +424,18 @@ def build_system_prompt(student: Student) -> str:
                 f"当前知识点「{topic_name}」可以用这个情境引入：\n"
                 f"{get_math_context_for_interest(matched_interest, topic_name)}"
             )
+        elif topic_name:
+            # 兜底：按知识点维度取趣味模板（规格 13.7.3），保留原兴趣优先逻辑
+            templates = get_topic_templates(
+                topic_name,
+                student.interests[0] if student.interests else "",
+            )
+            if templates:
+                import random
+                context_parts.append(
+                    f"- 【趣味情境模板】当前知识点「{topic_name}」可用此情境引入（已按学生兴趣个性化）：\n"
+                    f"{random.choice(templates)}"
+                )
     if student.week_baseline_count >= 4:
         context_parts.append("- ⚠️ 本周全是保底日：请在自然时机温柔建议明天试试小挑战（不批评）")
 
