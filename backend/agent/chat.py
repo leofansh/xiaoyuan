@@ -1512,6 +1512,13 @@ def end_session(student: Student) -> dict:
         except ImportError:
             pass
 
+    # BKT 学生级学习速度偏移 s_u 重估（进度表 135，§2.2）：会话结束自然挂点，
+    # 仅当累计干净观测 ≥10 才重估写回，否则保持默认 0.5（冷启动零风险）。
+    if getattr(student, "bkt_obs_total", 0) >= 10:
+        from backend.services import bkt
+
+        student.bkt_learn_offset = bkt.estimate_learn_offset(student)
+
     storage.save(student)
     return summary
 

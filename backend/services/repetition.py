@@ -172,6 +172,11 @@ def record_review(student: Student, topic_id: str, success: bool) -> None:
     if len(student.review_logs) > _REVIEW_LOG_CAP:
         student.review_logs = student.review_logs[-_REVIEW_LOG_CAP:]
 
+    # BKT 观测接入（进度表 135，§5）：复习作答 = 强观测，二值 success 直接映射 correct
+    from backend.services import bkt
+
+    bkt.update_bkt(student, topic_id, bool(success))
+
 
 def generate_retrieval_question(student: Student, topic_id: str) -> str:
     """生成检索练习题：不给提示，直接出题考。"""

@@ -72,6 +72,9 @@ def apply_eval(student: Student, eval_data: dict, *, suppress_combo: bool = Fals
 
     mastery_updates = eval_data.get("mastery_updates") or {}
     independent_success = eval_data.get("independent_success") is True
+    # BKT 观测清洗（进度表 135，§5）：仅当 independent_success 为显式 bool（真实作答轮）才入 BKT；
+    # 缺省（LLM 未作答，.get 返回 None）不入。轮级信号只作"是否有真实作答"判定。
+    bkt_answer_round = isinstance(eval_data.get("independent_success"), bool)
     newly_mastered: list[str] = []  # 掌握度从 <0.7 跨越到 >=0.7 的知识点
     for topic_id, score in mastery_updates.items():
         if not syllabus.get_node(topic_id) or not isinstance(score, (int, float)):
@@ -90,6 +93,12 @@ def apply_eval(student: Student, eval_data: dict, *, suppress_combo: bool = Fals
         student.mastery[topic_id] = new_rec
         if old_score < 0.7 <= new_rec.score:
             newly_mastered.append(topic_id)
+
+        # BKT 中观测接入：每知识点 correct = (score >= 0.6)（知识点级评分，规避一轮刷 N 点）
+        if bkt_answer_round:
+            from backend.services.bkt import update_bkt
+
+            update_bkt(student, topic_id, float(score) >= 0.6)
 
     # 2. 新漏洞
     # 2. 新漏洞（B2：精细分类 + 根因 + 修复策略 + 复发追踪）

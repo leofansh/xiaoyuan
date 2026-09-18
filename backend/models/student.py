@@ -196,6 +196,11 @@ class MasteryRecord(BaseModel):
     attempts_correct: int = 0
     attempts_total: int = 0
     last_interaction: str = ""
+    # ---- BKT-6 状态（进度表 135；默认值零破坏）----
+    p_known: float = 0.0        # BKT 掌握概率 P(L)，0=未初始化
+    bkt_n: int = 0              # BKT 已消费的作答数（用于 s_u 重估时机判断）
+    last_bkt_update: str = ""   # 上轮 BKT 更新日期 ISO（遗忘阻尼用）
+    bkt_mastered: bool = False  # 达标滞回锁存（§1.2：≥0.90 进入、<0.80 退出）
 
 
 class Student(BaseModel):
@@ -256,6 +261,11 @@ class Student(BaseModel):
     # ---- V3.0 K.2：防认知卸载护栏 ----
     offload_events: list[dict[str, Any]] = Field(default_factory=list)  # 认知卸载事件
     skipped_topics: dict[str, int] = Field(default_factory=dict)        # 跳过计数 {topic_id: n}
+
+    # ---- BKT 学生级参数（进度表 135，§3.2）----
+    bkt_learn_offset: float = 0.5    # 学生全局学习速度偏移 s_u（0.5 = 标准 BKT）
+    bkt_obs_correct: int = 0         # 干净观测累计答对数（跨知识点池化，s_u 重估用）
+    bkt_obs_total: int = 0           # 干净观测累计作答数
 
     # ---- V3.0 模块 L：双向有效交流 ----
     language_level: int = 2          # 学段语言层级 1~4（0~3/4~6/7~9/10~12 年级，L.5 自动推导）

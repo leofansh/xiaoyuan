@@ -234,6 +234,11 @@ def record_delayed_check_result(student, topic_id: str, success: bool) -> dict:
             rec.last_interaction = today[:10]
             result["rolled_back"] = True
             result["new_score"] = rec.score
+        # BKT 延迟验证失败观测（进度表 135，§5/§4）：correct=False + 显式遗忘回退 logit −1.5
+        from backend.services.bkt import _forget_logit, update_bkt
+
+        update_bkt(student, topic_id, False)
+        _forget_logit(student, topic_id)
         if rs:
             rs.delayed_check = False
             rs.claimed_at = ""
