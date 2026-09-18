@@ -977,6 +977,85 @@ async function submitTwentyFour() {
   }
 }
 
+async function renderWeekendView() {
+  const wrap = $("#view-weekend");
+  if (!wrap) return;
+  const t = (key) => (window.I18n && window.I18n.t) ? window.I18n.t(key) : key;
+
+  wrap.innerHTML = `
+    <div class="weekend-panel" style="max-width:640px;margin:0 auto;padding:16px;">
+      <h3 class="section-title">${escapeHtml(t("weekend.title"))}</h3>
+      <p style="font-size:13px;color:var(--muted);margin:-6px 0 16px;">${escapeHtml(t("weekend.subtitle"))}</p>
+      <div class="empty-hint">加载中…</div>
+    </div>
+  `;
+
+  let data;
+  try {
+    data = await api(`/api/student/${studentId}/weekend-gaps`, null, "GET");
+  } catch (e) {
+    wrap.innerHTML = `
+      <div class="weekend-panel" style="max-width:640px;margin:0 auto;padding:16px;">
+        <h3 class="section-title">${escapeHtml(t("weekend.title"))}</h3>
+        <div class="empty-hint">${escapeHtml(e.message || "加载失败")}</div>
+      </div>`;
+    return;
+  }
+
+  const concept = data.concept_gaps || [];
+  const careless = data.careless_gaps || [];
+  const cleared = !!data.weekend_cleared;
+
+  const badgeHtml = cleared
+    ? `<div class="weekend-badge weekend-badge-done">${escapeHtml(t("weekend.badgeDone"))}</div>`
+    : `<div class="weekend-badge weekend-badge-todo">${escapeHtml(t("weekend.badgeTodo"))}</div>`;
+
+  const renderGap = (g) => {
+    const count = g.occurrence_count != null
+      ? `<span class="weekend-gap-count">${g.occurrence_count}${escapeHtml(t("weekend.times"))}</span>`
+      : "";
+    const evidence = g.evidence ? `<div class="weekend-gap-evidence">${escapeHtml(g.evidence)}</div>` : "";
+    return `
+      <div class="weekend-gap-card">
+        <div class="weekend-gap-head">
+          <span class="weekend-gap-name">${escapeHtml(g.topic_name || "")}</span>
+          ${count}
+        </div>
+        <div class="weekend-gap-category">${escapeHtml(t("weekend.categoryPrefix"))}${escapeHtml(g.category || "")}</div>
+        ${g.root_cause ? `<div class="weekend-gap-line">${escapeHtml(g.root_cause)}</div>` : ""}
+        ${g.repair_strategy ? `<div class="weekend-gap-line">${escapeHtml(g.repair_strategy)}</div>` : ""}
+        ${evidence}
+      </div>`;
+  };
+
+  const conceptSection = concept.length
+    ? concept.map(renderGap).join("")
+    : `<div class="empty-hint">${escapeHtml(t("weekend.conceptEmpty"))}</div>`;
+
+  const carelessSection = careless.length
+    ? careless.map(renderGap).join("")
+    : `<div class="empty-hint">${escapeHtml(t("weekend.carelessEmpty"))}</div>`;
+
+  wrap.innerHTML = `
+    <div class="weekend-panel" style="max-width:640px;margin:0 auto;padding:16px;">
+      <h3 class="section-title">${escapeHtml(t("weekend.title"))}</h3>
+      <p style="font-size:13px;color:var(--muted);margin:-6px 0 16px;">${escapeHtml(t("weekend.subtitle"))}</p>
+      <button id="weekend-start-btn" class="btn-primary" style="width:100%;margin-bottom:16px;">${escapeHtml(t("weekend.startBtn"))}</button>
+      ${badgeHtml}
+      <h3 class="section-title">${escapeHtml(t("weekend.conceptTitle"))}</h3>
+      <div class="weekend-gap-list">${conceptSection}</div>
+      <h3 class="section-title">${escapeHtml(t("weekend.carelessTitle"))}</h3>
+      <div class="weekend-gap-list">${carelessSection}</div>
+    </div>
+  `;
+
+  $("#weekend-start-btn").onclick = async () => {
+    await chooseMode("weekend");
+    const chatTab = document.querySelector('.tab[data-view="chat"]');
+    if (chatTab) chatTab.click();
+  };
+}
+
 async function sendChat() {
   const input = $("#chat-input");
   const text = input.value.trim();
@@ -1231,6 +1310,7 @@ $all(".tab").forEach(tab => {
     if (currentView === "pbl") { if (window.PBLView) window.PBLView.loadInto("view-pbl"); }
     if (currentView === "creations") renderCreations();
     if (currentView === "games") renderTwentyFour();
+    if (currentView === "weekend") renderWeekendView();
   };
 });
 

@@ -177,6 +177,41 @@ def get_progress(student_id: str):
     }
 
 
+@app.get("/api/student/{student_id}/weekend-gaps")
+def get_weekend_gaps(student_id: str):
+    """周末修复视图：返回 open/recurring 漏洞清单与清零成就数据。"""
+    s = _load_student(student_id)
+
+    def _gap_dict(g):
+        return {
+            "topic_id": g.topic_id,
+            "topic_name": g.topic_name or g.topic_id,
+            "category": g.category,
+            "root_cause": g.root_cause,
+            "repair_strategy": g.repair_strategy,
+            "evidence": g.evidence,
+            "status": g.status,
+            "found_at": g.found_at,
+            "last_occurred": g.last_occurred,
+            "occurrence_count": g.occurrence_count,
+        }
+
+    concept_gaps = [_gap_dict(g) for g in s.open_gaps() if g.type == "concept"]
+    careless_gaps = [_gap_dict(g) for g in s.open_gaps() if g.type == "careless"]
+
+    try:
+        today_mode = s.current_session.mode
+    except Exception:  # noqa: BLE001
+        today_mode = "unknown"
+
+    return {
+        "concept_gaps": concept_gaps,
+        "careless_gaps": careless_gaps,
+        "weekend_cleared": Badge.WEEKEND_CLEAR in s.badges,
+        "today_mode": today_mode,
+    }
+
+
 @app.get("/api/student/{student_id}/weekly-report")
 def get_weekly_report(student_id: str):
     """获取本周学习报告。"""

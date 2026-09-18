@@ -98,6 +98,7 @@
     "mastery.new_gain": "又进步了一点！",
     "nav.creations": "🎨 我的作品",
     "nav.games": "🎮 小游戏",
+    "nav.weekend": "🧹 周末修复",
     "input.problem": "📝 出一道题",
     "creations.title": "🎨 我的作品",
     "creations.newProblem": "📝 出一道题",
@@ -129,7 +130,19 @@
     "games.solutions": "这题有 {n} 种解法",
     "games.correct": "算出来啦！正是 24！",
     "games.wrong": "再想想？还差一点～",
-    "games.error": "网络开小差了，再试一次"
+    "games.error": "网络开小差了，再试一次",
+
+    "weekend.title": "🧹 周末修复",
+    "weekend.subtitle": "每周一次，30 分钟左右，把本周的漏洞逐个清零，轻装上阵迎接新课～",
+    "weekend.startBtn": "🚀 开始周末修复",
+    "weekend.badgeDone": "🏅 已达成「清零大师」徽章",
+    "weekend.badgeTodo": "完成一次周末修复并清零全部概念漏洞，即可获得「清零大师」徽章",
+    "weekend.conceptTitle": "🧠 概念漏洞",
+    "weekend.carelessTitle": "📝 粗心漏洞",
+    "weekend.conceptEmpty": "太棒了，本周没有概念漏洞！",
+    "weekend.carelessEmpty": "太棒了，本周没有粗心漏洞！",
+    "weekend.categoryPrefix": "分类：",
+    "weekend.times": " 次出现"
   },
   
   "en": {
@@ -231,6 +244,7 @@
     "mastery.new_gain": "Getting better!",
     "nav.creations": "🎨 My Works",
     "nav.games": "🎮 Games",
+    "nav.weekend": "🧹 Weekend Repair",
     "input.problem": "📝 Make a Problem",
     "creations.title": "🎨 My Works",
     "creations.newProblem": "📝 Make a Problem",
@@ -262,6 +276,18 @@
     "games.solutions": "{n} solutions",
     "games.correct": "You made 24!",
     "games.wrong": "Not quite yet - try again!",
-    "games.error": "Network hiccup - try again"
+    "games.error": "Network hiccup - try again",
+
+    "weekend.title": "🧹 Weekend Repair",
+    "weekend.subtitle": "Once a week, about 30 minutes - clear every gap from this week and start fresh for new lessons~",
+    "weekend.startBtn": "🚀 Start Weekend Repair",
+    "weekend.badgeDone": "🏅 Earned the 'Clearing Master' badge",
+    "weekend.badgeTodo": "Complete one Weekend Repair and clear all concept gaps to earn the 'Clearing Master' badge",
+    "weekend.conceptTitle": "🧠 Concept Gaps",
+    "weekend.carelessTitle": "📝 Careless Gaps",
+    "weekend.conceptEmpty": "Great, no concept gaps this week!",
+    "weekend.carelessEmpty": "Great, no careless gaps this week!",
+    "weekend.categoryPrefix": "Category: ",
+    "weekend.times": " times"
   }
 }

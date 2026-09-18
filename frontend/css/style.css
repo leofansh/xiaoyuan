@@ -622,6 +622,24 @@ body {
 .gap-tag.careless { background: #fff3dd; color: #c9963c; }
 .empty-hint { color: var(--muted); font-size: 13px; text-align: center; padding: 20px; }
 
+/* ---------------- 周末修复 ---------------- */
+.weekend-badge {
+  text-align: center; border-radius: 14px; padding: 12px 14px;
+  font-size: 13px; font-weight: 600; margin-bottom: 8px;
+}
+.weekend-badge-done { background: #fef3c7; color: #92400e; }
+.weekend-badge-todo { background: var(--bg2); color: var(--muted); }
+.weekend-gap-card {
+  background: white; border-radius: 16px; padding: 12px 16px; margin-bottom: 8px;
+  box-shadow: var(--soft-shadow); font-size: 13px;
+}
+.weekend-gap-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.weekend-gap-name { font-weight: 700; color: #6d555a; }
+.weekend-gap-count { flex-shrink: 0; font-size: 11px; color: var(--muted); }
+.weekend-gap-category { font-size: 12px; color: var(--accent); margin-top: 2px; }
+.weekend-gap-line { color: var(--muted); font-size: 12px; margin-top: 4px; line-height: 1.5; }
+.weekend-gap-evidence { color: #c9963c; font-size: 12px; margin-top: 4px; }
+
 /* ---------------- 学习记录时间线 ---------------- */
 .history-list { position: relative; padding-left: 22px; }
 .history-list::before {
