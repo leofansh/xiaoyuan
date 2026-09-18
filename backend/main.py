@@ -256,6 +256,7 @@ def delete_history_record(payload: HistoryDelete):
 class ApiKeyUpdate(BaseModel):
     api_key: str = ""
     pure_mode: bool | None = None  # V3.0 P0：纯学习模式开关（可单独提交）
+    card_drop_rates: dict | None = None  # V3.0 13.9.4：卡片掉落概率（可单独提交）
 
 
 # ---------------------------------------------------------------------------
@@ -406,7 +407,7 @@ async def test_llm_connection(payload: LLMTestRequest):
 def get_config():
     key = config.get_api_key()
     masked = (key[:7] + "****" + key[-4:]) if len(key) > 12 else ("****" if key else "")
-    return {"api_key_masked": masked, "has_key": bool(key), "pure_mode": config.get_pure_mode()}
+    return {"api_key_masked": masked, "has_key": bool(key), "pure_mode": config.get_pure_mode(), "card_drop_rates": config.get_card_drop_rates()}
 
 
 @app.post("/api/config")
@@ -415,6 +416,9 @@ def update_config(payload: ApiKeyUpdate):
     if payload.pure_mode is not None:
         config.set_pure_mode(payload.pure_mode)
         return {"ok": True, "message": "纯学习模式已更新"}
+    if payload.card_drop_rates is not None:
+        rates = config.set_card_drop_rates(payload.card_drop_rates)
+        return {"ok": True, "message": "卡片掉落概率已更新", "card_drop_rates": rates}
     key = payload.api_key.strip()
     if not key:
         raise HTTPException(status_code=400, detail="API Key 不能为空")

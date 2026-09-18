@@ -185,3 +185,107 @@ def set_pure_mode(value: bool) -> None:
     rc = _load_runtime_config()
     rc["pure_mode"] = bool(value)
     _save_runtime_config(rc)
+
+
+DEFAULT_CARD_DROP_RATES = {"common": 0.60, "rare": 0.30, "epic": 0.09, "legendary": 0.01}
+
+
+def _normalize_card_drop_rates(rates) -> dict[str, float]:
+    """对 4 个稀有度逐 key 白名单规范化：数值非负才接受，缺 key 用默认。"""
+    if not isinstance(rates, dict):
+        rates = {}
+    normalized = {}
+    for key, default in DEFAULT_CARD_DROP_RATES.items():
+        v = rates.get(key, default)
+        normalized[key] = float(v) if isinstance(v, (int, float)) and v >= 0 else default
+    return normalized
+
+
+def get_card_drop_rates() -> dict[str, float]:
+    """V3.0 13.9.4：读取卡片掉落概率（运行时配置优先，缺省用默认值）。"""
+    rc = _load_runtime_config()
+    raw = rc.get("card_drop_rates")
+    if not isinstance(raw, dict):
+        return dict(DEFAULT_CARD_DROP_RATES)
+    return _normalize_card_drop_rates(raw)
+
+
+def set_card_drop_rates(rates: dict) -> dict[str, float]:
+    """V3.0 13.9.4：保存卡片掉落概率，返回规范化后的 dict。"""
+    normalized = _normalize_card_drop_rates(rates)
+    rc = _load_runtime_config()
+    rc["card_drop_rates"] = normalized
+    _save_runtime_config(rc)
+    return normalized
+
+
+DEFAULT_VARIABLE_REWARDS = {
+    "pet_event_prob": 0.05,
+    "pet_event_daily_max": 1,
+    "pet_event_xp_range": [3, 8],
+    "combo_crit_threshold": 5,
+    "combo_crit_prob": 0.25,
+    "combo_crit_xp_multiplier": 2,
+    "combo_crit_guarantee_rarity": "epic",
+}
+
+_VALID_RARITIES = ("common", "rare", "epic", "legendary")
+
+
+def _normalize_variable_rewards(vr) -> dict:
+    """对可变奖励逐 key 白名单规范化：非法/越界回退默认，缺 key 用默认。"""
+    if not isinstance(vr, dict):
+        vr = {}
+    d = DEFAULT_VARIABLE_REWARDS
+
+    def _prob(key: str):
+        v = vr.get(key, d[key])
+        return float(v) if isinstance(v, (int, float)) and 0.0 <= v <= 1.0 else d[key]
+
+    def _pos_num(key: str):
+        v = vr.get(key, d[key])
+        return v if isinstance(v, (int, float)) and v > 0 else d[key]
+
+    def _pos_int(key: str):
+        v = vr.get(key, d[key])
+        return int(v) if isinstance(v, int) and not isinstance(v, bool) and v >= 0 else d[key]
+
+    rng = vr.get("pet_event_xp_range", d["pet_event_xp_range"])
+    if (isinstance(rng, (list, tuple)) and len(rng) == 2
+            and all(isinstance(x, int) and not isinstance(x, bool) and x >= 0 for x in rng)
+            and rng[0] <= rng[1]):
+        xp_range = [rng[0], rng[1]]
+    else:
+        xp_range = list(d["pet_event_xp_range"])
+
+    rarity = vr.get("combo_crit_guarantee_rarity", d["combo_crit_guarantee_rarity"])
+    if rarity not in _VALID_RARITIES:
+        rarity = d["combo_crit_guarantee_rarity"]
+
+    return {
+        "pet_event_prob": _prob("pet_event_prob"),
+        "pet_event_daily_max": _pos_int("pet_event_daily_max"),
+        "pet_event_xp_range": xp_range,
+        "combo_crit_threshold": _pos_int("combo_crit_threshold"),
+        "combo_crit_prob": _prob("combo_crit_prob"),
+        "combo_crit_xp_multiplier": _pos_num("combo_crit_xp_multiplier"),
+        "combo_crit_guarantee_rarity": rarity,
+    }
+
+
+def get_variable_rewards() -> dict:
+    """V3.0 13.9.4：读取可变奖励配置（运行时配置优先，缺省用默认值）。"""
+    rc = _load_runtime_config()
+    raw = rc.get("variable_rewards")
+    if not isinstance(raw, dict):
+        return dict(DEFAULT_VARIABLE_REWARDS)
+    return _normalize_variable_rewards(raw)
+
+
+def set_variable_rewards(vr: dict) -> dict:
+    """V3.0 13.9.4：保存可变奖励配置，返回规范化后的 dict。"""
+    normalized = _normalize_variable_rewards(vr)
+    rc = _load_runtime_config()
+    rc["variable_rewards"] = normalized
+    _save_runtime_config(rc)
+    return normalized

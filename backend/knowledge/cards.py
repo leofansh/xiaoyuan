@@ -12,6 +12,7 @@ from __future__ import annotations
 import random
 from datetime import datetime
 
+from backend.config import get_card_drop_rates
 from backend.knowledge.syllabus import NODES, get_node
 
 # ---------------------------------------------------------------------------
@@ -140,11 +141,11 @@ def all_cards() -> list[dict]:
 
 
 def random_rarity() -> str:
-    """按稀有度概率随机取一种稀有度。"""
+    """按稀有度概率随机取一种稀有度（概率取自运行时配置）。"""
     r = random.random()
     acc = 0.0
-    for rarity, cfg in RARITY.items():
-        acc += cfg["prob"]
+    for rarity, prob in get_card_drop_rates().items():
+        acc += prob
         if r <= acc:
             return rarity
     return "common"
@@ -164,6 +165,10 @@ def _pick_random_card(target_rarity: str | None = None, exclude: set[str] | None
     exclude = exclude or set()
     if target_rarity:
         pool = [c for cid, c in CARD_LIBRARY.items() if c["rarity"] == target_rarity and cid not in exclude]
+        if pool:
+            return random.choice(pool)
+        # 该稀有度未收集卡已耗尽 → 从该稀有度全部卡中选（可重复，转星光）
+        pool = [c for cid, c in CARD_LIBRARY.items() if c["rarity"] == target_rarity]
         if pool:
             return random.choice(pool)
     pool = [c for cid, c in CARD_LIBRARY.items() if cid not in exclude]
