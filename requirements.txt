@@ -1,4 +1,5 @@
 fastapi>=0.115.0
+fsrs==6.3.2  # FSRS-6 间隔重复算法（复习调度）
 uvicorn[standard]>=0.30.0
 openai>=1.50.0
 python-dotenv>=1.0.0

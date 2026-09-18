@@ -152,6 +152,23 @@ class ReviewSchedule(BaseModel):
     # ---- V3.0 模块 L.4.1：延迟验证标记（验证题 = 复习题，复用同一调度器）----
     delayed_check: bool = False     # 是否来自费曼检查登记的延迟验证
     claimed_at: str = ""            # 首次声称掌握的时间（false_mastery 事件用）
+    # ---- FSRS-6 状态字段（对外零破坏，next_review 仍为对外"到期日"）----
+    stability: float = 0.0          # FSRS 记忆稳定性（天）
+    difficulty: float = 0.0         # FSRS 难度（1~10）
+    state: int = 0                  # FSRS 状态：0=New 1=Learning 2=Review 3=Relearning
+    due: str = ""                   # FSRS due（ISO datetime）
+
+
+class ReviewLog(BaseModel):
+    """FSRS 复习日志：每次作答的评分与状态快照。"""
+    topic_id: str
+    rating: int = 0                  # 1=Again 2=Hard 3=Good 4=Easy
+    review_datetime: str = ""        # 作答时间 ISO datetime
+    elapsed_days: float = 0.0        # 距上次复习/到期经过的天数
+    scheduled_days: int = 0          # 作答前的间隔天数
+    state: int = 0                   # 作答后 FSRS 状态
+    stability: float = 0.0           # 作答后稳定性
+    difficulty: float = 0.0          # 作答后难度
 
 
 class TeachingInsight(BaseModel):
@@ -208,6 +225,7 @@ class Student(BaseModel):
     student_profile: StudentProfile = Field(default_factory=StudentProfile)
     cognitive_profile: CognitiveProfile = Field(default_factory=CognitiveProfile)
     review_schedules: list[ReviewSchedule] = Field(default_factory=list)
+    review_logs: list[ReviewLog] = Field(default_factory=list)
     teaching_journal: list[TeachingInsight] = Field(default_factory=list)
     cognitive_assessment_answers: list[dict[str, Any]] = Field(default_factory=list)  # 认知评估答题记录
     thinking_model_mastery: dict[str, float] = Field(default_factory=dict)  # 思维模型掌握度 {模型ID: 0.0~1.0}

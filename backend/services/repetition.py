@@ -1,12 +1,15 @@
 """间隔复习调度：基于遗忘曲线安排复习时间，检索练习出题。"""
 
-from datetime import datetime, timedelta
+import hashlib
+from datetime import datetime, timedelta, timezone
+
+from fsrs import Scheduler, Card as FSRSCard, Rating
 
 from backend.knowledge import syllabus
-from backend.models.student import ReviewSchedule, Student
+from backend.models.student import ReviewLog, ReviewSchedule, Student
 
 
-# 复习间隔规则：掌握度 → 间隔天数
+# 复习间隔规则：掌握度 → 间隔天数（仅用于首次排期 / 尚无 FSRS 状态时的初始间隔）
 REVIEW_INTERVALS = [
     (0.3, 1),   # 掌握度 < 0.3: 1天后复习
     (0.5, 2),   # 掌握度 < 0.5: 2天后复习
@@ -15,22 +18,57 @@ REVIEW_INTERVALS = [
     (1.0, 20),  # 掌握度 >= 0.85: 20天后复习
 ]
 
+# FSRS-6 调度器：子日步骤置空 → 天级间隔（与教学场景匹配，不产生分钟级步骤）
+_SCHEDULER = Scheduler(learning_steps=(), relearning_steps=())
+
+_INITIAL_DIFFICULTY = 5.0
+_REVIEW_LOG_CAP = 200
+
+
+def _now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _interval_for_mastery(mastery: float) -> int:
+    for threshold, days in REVIEW_INTERVALS:
+        if mastery < threshold:
+            return days
+    return REVIEW_INTERVALS[-1][1]
+
+
+def _card_id_for(topic_id: str) -> int:
+    return int(hashlib.md5(topic_id.encode("utf-8")).hexdigest()[:8], 16)
+
+
+def _build_card(rs: ReviewSchedule) -> FSRSCard:
+    """从 ReviewSchedule 重建 FSRS 卡片；无 FSRS 状态时退回全新卡片。"""
+    card_id = _card_id_for(rs.topic_id)
+    if rs.state == 0 or not rs.due:
+        return FSRSCard(card_id=card_id)
+
+    last_review = None
+    if rs.last_reviewed:
+        last_review = datetime.fromisoformat(rs.last_reviewed).replace(tzinfo=timezone.utc)
+
+    return FSRSCard.from_dict({
+        "card_id": card_id,
+        "state": rs.state,
+        "step": None,
+        "stability": rs.stability if rs.stability else None,
+        "difficulty": rs.difficulty if rs.difficulty else None,
+        "due": rs.due,
+        "last_review": last_review.isoformat() if last_review else None,
+    })
+
 
 def schedule_review(student: Student, topic_id: str, mastery: float) -> None:
     """为知识点安排或更新复习计划。"""
-    from backend.knowledge import syllabus as _syl
-    node = _syl.get_node(topic_id)
+    node = syllabus.get_node(topic_id)
     if not node:
         return
 
-    # 找到对应的复习间隔
-    interval = 1
-    for threshold, days in REVIEW_INTERVALS:
-        if mastery < threshold:
-            interval = days
-            break
+    interval = _interval_for_mastery(mastery)
 
-    # 检查是否已有该知识点的复习计划
     existing = None
     for rs in student.review_schedules:
         if rs.topic_id == topic_id:
@@ -40,14 +78,27 @@ def schedule_review(student: Student, topic_id: str, mastery: float) -> None:
     today = datetime.now().date()
     next_review = today + timedelta(days=interval)
 
-    if existing:
-        # 如果已有计划，只在掌握度提升时延长间隔
+    if existing and existing.state == 2:
+        # 已有 FSRS 状态：保持旧滞回逻辑（仅掌握度提升时延长，不重置 FSRS 状态/due）
         if mastery > existing.mastery_at_schedule + 0.1:
             existing.interval_days = interval
             existing.next_review = next_review.isoformat()
             existing.mastery_at_schedule = mastery
+        return
+
+    due = (_now_utc() + timedelta(days=interval)).isoformat()
+
+    if existing:
+        # 旧数据 / 重置：重新初始化 FSRS 状态
+        existing.interval_days = interval
+        existing.next_review = next_review.isoformat()
+        existing.mastery_at_schedule = mastery
+        existing.stability = float(interval)
+        existing.difficulty = _INITIAL_DIFFICULTY
+        existing.state = 2
+        existing.due = due
     else:
-        # 创建新计划
+        # 创建新计划（FSRS 冷启动：用掌握度当初始稳定性，不视为一次作答）
         student.review_schedules.append(
             ReviewSchedule(
                 topic_id=topic_id,
@@ -57,6 +108,10 @@ def schedule_review(student: Student, topic_id: str, mastery: float) -> None:
                 review_count=0,
                 last_reviewed="",
                 mastery_at_schedule=mastery,
+                stability=float(interval),
+                difficulty=_INITIAL_DIFFICULTY,
+                state=2,
+                due=due,
             )
         )
 
@@ -72,21 +127,50 @@ def get_due_reviews(student: Student) -> list[ReviewSchedule]:
 
 def record_review(student: Student, topic_id: str, success: bool) -> None:
     """记录一次复习完成，更新下次复习时间。"""
-    for rs in student.review_schedules:
-        if rs.topic_id == topic_id:
-            rs.review_count += 1
-            rs.last_reviewed = datetime.now().date().isoformat()
-
-            if success:
-                # 复习成功：间隔翻倍（最长30天）
-                new_interval = min(rs.interval_days * 2, 30)
-            else:
-                # 复习失败：间隔减半（最短1天）
-                new_interval = max(rs.interval_days // 2, 1)
-
-            rs.interval_days = new_interval
-            rs.next_review = (datetime.now().date() + timedelta(days=new_interval)).isoformat()
+    rs = None
+    for item in student.review_schedules:
+        if item.topic_id == topic_id:
+            rs = item
             break
+    if rs is None:
+        return
+
+    rating = Rating.Good if success else Rating.Again
+    old_interval_days = rs.interval_days
+    card = _build_card(rs)
+    new_card, _ = _SCHEDULER.review_card(card, rating)
+
+    now = _now_utc()
+    stability = float(new_card.stability)
+    interval_days = max(1, round(stability))
+
+    rs.stability = stability
+    rs.difficulty = float(new_card.difficulty)
+    rs.state = int(new_card.state.value)
+    rs.due = new_card.due.isoformat()
+    rs.review_count += 1
+    rs.last_reviewed = now.date().isoformat()
+    rs.interval_days = interval_days
+    rs.next_review = (now.date() + timedelta(days=interval_days)).isoformat()
+
+    elapsed_days = 0.0
+    if card.last_review is not None:
+        elapsed_days = max(0.0, (now - card.last_review).total_seconds() / 86400.0)
+
+    student.review_logs.append(
+        ReviewLog(
+            topic_id=topic_id,
+            rating=int(rating),
+            review_datetime=now.isoformat(),
+            elapsed_days=elapsed_days,
+            scheduled_days=old_interval_days,
+            state=int(new_card.state.value),
+            stability=stability,
+            difficulty=float(new_card.difficulty),
+        )
+    )
+    if len(student.review_logs) > _REVIEW_LOG_CAP:
+        student.review_logs = student.review_logs[-_REVIEW_LOG_CAP:]
 
 
 def generate_retrieval_question(student: Student, topic_id: str) -> str:
