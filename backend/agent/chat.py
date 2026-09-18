@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import random
 from datetime import datetime
 from typing import AsyncGenerator
 
@@ -21,6 +22,17 @@ from backend.services.teaching_journal import (
 from backend.services.wellbeing import check_time_limit
 from backend.services.interest_extractor import extract_interests, personalized_opening
 from backend.services.storage import StudentStorage, get_storage
+
+
+# 规格 12.4.5#2：内在动机过渡机制话术（常量放 chat.py，不放 persona.py）
+_INTRINSIC_STREAK_THRESHOLD = 14
+_INTRINSIC_FEEDBACK_PROB = 0.30
+_INTRINSIC_FIRST_NOTICE = "你好像已经不需要宠物提醒了呢，这全靠你自己想学呀"
+_INTRINSIC_POSITIVE_FEEDBACK = [
+    "你又主动来啦，真好",
+    "不用催就自己来学，太棒了",
+    "你越来越会安排自己的学习啦",
+]
 
 
 def start_session(student: Student, mood: str) -> dict:
@@ -83,7 +95,9 @@ def start_session(student: Student, mood: str) -> dict:
         opening += "（悄悄说：这周我们都在充电呀，明天状态好的话来个小挑战？）"
 
     # V3.0 P1：开场注入宠物心情话术（规格3.5·集成点：chat.py 开场时注入宠物心情话术）
-    if not pure_mode:
+    # 规格 12.4.5#2：内在动机阶段减少宠物主动打扰，改用纯正反馈（无催促）
+    intrinsic_stage = not pure_mode and student.streak_chain >= _INTRINSIC_STREAK_THRESHOLD
+    if not pure_mode and not intrinsic_stage:
         try:
             from backend.services.pet import compute_mood, ensure_pet, interact_message
             pet = ensure_pet(student.pet)
@@ -93,6 +107,16 @@ def start_session(student: Student, mood: str) -> dict:
                 opening += f"\n\n🐾 {pet_msg}"
         except ImportError:
             pass
+
+    # 规格 12.4.5#2：内在动机过渡机制（连续 14 天主动学习）
+    if intrinsic_stage:
+        vm = student.v3_meta
+        if vm.get("motivational_stage") != "intrinsic":
+            vm["motivational_stage"] = "intrinsic"
+            vm["intrinsic_notified_at"] = datetime.now().isoformat(timespec="seconds")
+            opening += f"\n\n🌸 {_INTRINSIC_FIRST_NOTICE}"
+        elif random.random() < _INTRINSIC_FEEDBACK_PROB:
+            opening += f"\n\n🌸 {random.choice(_INTRINSIC_POSITIVE_FEEDBACK)}"
 
     # 检查是否有待复习内容
     due_reviews = get_due_reviews(student)

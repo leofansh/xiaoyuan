@@ -411,9 +411,11 @@ def _apply_p1_rewards(student: Student, *, independent_success: bool,
     """
     import random as _random
 
-    from backend.config import get_pure_mode
+    from backend.config import get_pure_mode, get_variable_rewards
     from backend.knowledge.cards import drop_card, ensure_cards
     from backend.services.pet import add_xp, ensure_pet
+
+    vr = get_variable_rewards()
 
     if get_pure_mode():
         return {"combo": None, "card_drop": None, "xp_events": [], "pet": None}
@@ -471,6 +473,46 @@ def _apply_p1_rewards(student: Student, *, independent_success: bool,
         if milestone and xp_bonus:
             rewards["xp_events"].append({"source": f"combo_{current}", "amount": xp_bonus,
                                          "message": rewards["combo"]["message"]})
+
+        # 规格 13.9.4：连击暴击（达到阈值且概率触发）
+        crit = False
+        crit_effect = None
+        if current >= vr["combo_crit_threshold"] and _random.random() < vr["combo_crit_prob"]:
+            crit = True
+            if _random.random() < 0.5:
+                # A) 本答 XP 按 combo_crit_xp_multiplier 放大（追加被加倍的部分）
+                crit_effect = "xp"
+                base_xp = 5 + xp_bonus
+                crit_extra = int(round(base_xp * (vr["combo_crit_xp_multiplier"] - 1)))
+                rewards["xp_events"].append({"source": "combo_crit", "amount": crit_extra, "message": "暴击！"})
+            else:
+                # B) 必掉稀有卡（保底稀有度由配置指定）
+                crit_effect = "card"
+                cards = ensure_cards(student.cards)
+                dc = drop_card(cards, source="combo_crit", force_rarity=vr["combo_crit_guarantee_rarity"])
+                student.cards = cards
+                if dc["dropped"] and rewards["card_drop"] is None:
+                    rewards["card_drop"] = dc
+        rewards["combo"]["crit"] = crit
+        rewards["combo"]["crit_effect"] = crit_effect
+
+        # 规格 13.9.4：宠物随机事件（真实学习成功后概率触发，每日上限）
+        _today = datetime.now().date().isoformat()
+        if student.v3_meta.get("pet_event_date") != _today:
+            student.v3_meta["pet_event_date"] = _today
+            student.v3_meta["pet_event_count"] = 0
+        if (_random.random() < vr["pet_event_prob"]
+                and student.v3_meta.get("pet_event_count", 0) < vr["pet_event_daily_max"]):
+            student.v3_meta["pet_event_count"] = student.v3_meta.get("pet_event_count", 0) + 1
+            if _random.random() < 0.5:
+                xp = _random.randint(vr["pet_event_xp_range"][0], vr["pet_event_xp_range"][1])
+                rewards["xp_events"].append({"source": "pet_random", "amount": xp, "message": "宠物送你一个礼物！"})
+            else:
+                cards = ensure_cards(student.cards)
+                dc = drop_card(cards, source="pet_random")
+                student.cards = cards
+                if dc["dropped"] and rewards["card_drop"] is None:
+                    rewards["card_drop"] = dc
 
         # 答对 10% 随机掉卡（规格 4.3.3）
         if _random.random() < 0.10:

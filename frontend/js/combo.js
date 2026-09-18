@@ -51,12 +51,33 @@ function showComboResetEncouragement(message) {
   setTimeout(() => el.remove(), 1500);
 }
 
+/* ---------------- 连击暴击特效（规格 13.9.4） ---------------- */
+function showComboCritEffect(data) {
+  const sub = data.crit_effect === "card" ? "暴击！掉落了稀有卡" : "暴击！XP ×2";
+  const overlay = document.createElement("div");
+  overlay.className = "combo-celebrate";
+  overlay.innerHTML = `
+    <div class="combo-big" style="color:#f6c945;text-shadow:0 4px 30px rgba(246,201,69,.6),0 0 60px rgba(255,215,0,.5);">COMBO CRIT!</div>
+    <div class="combo-sub">${escapeHtml(sub)}</div>`;
+  document.body.appendChild(overlay);
+  setTimeout(() => overlay.remove(), 2200);
+
+  celebrate();
+}
+
 /* ---------------- SSE / 初始状态 ---------------- */
 function handleComboSSE(data) {
   if (!data) return;
   comboState.current = data.current != null ? data.current : comboState.current;
   renderComboIndicator(comboState.current);
-  showComboEffect(data);
+  if (data.crit === true) {
+    showComboCritEffect(data);
+  } else {
+    showComboEffect(data);
+  }
+  if (data.current > 0) {
+    Sound.play("combo");
+  }
   if (data.current === 0 && data.message) {
     showComboResetEncouragement(data.message);
   }
