@@ -60,6 +60,7 @@ function initThemeUI() {
     $("#settings-overlay").classList.remove("hidden");
     loadApiKey();
     loadPureMode();
+    loadSoundSetting();
   };
   $("#btn-settings-close").onclick = () => $("#settings-overlay").classList.add("hidden");
   $("#settings-overlay").addEventListener("click", e => {
@@ -72,6 +73,8 @@ function initThemeUI() {
   $("#llm-provider").onchange = onLLMProviderChange;
   // V3.0 P0: 纯学习模式开关
   $("#pure-mode-toggle").onchange = savePureMode;
+  // V3.0: 音效开关
+  $("#sound-toggle").onchange = saveSoundSetting;
 
   loadLLMConfig();
   applyTheme(localStorage.getItem("xy_theme") || "matcha", false);
@@ -105,6 +108,17 @@ async function savePureMode() {
   } catch (e) {
     toast("保存失败：" + (e.message || "未知错误"), 2500);
   }
+}
+
+// V3.0: 音效开关
+function loadSoundSetting() {
+  $("#sound-toggle").checked = Sound.enabled();
+}
+
+function saveSoundSetting() {
+  const on = $("#sound-toggle").checked;
+  Sound.setEnabled(on);
+  toast(on ? "🔊 音效已开启" : "🔇 音效已关闭", 2000);
 }
 
 async function saveApiKey() {
@@ -566,6 +580,7 @@ async function consumeSSE(resp, bubble) {
           `\n\n小圆发现你自己想通了！这种感觉是不是很棒？继续加油！🌟`
         );
         triggerInsightEffect();
+        Sound.play("insight");
         if (data.xp_reward) {
           toast(`✨ 顿悟奖励 +${data.xp_reward} XP！`, 3000);
         }
@@ -588,6 +603,7 @@ async function consumeSSE(resp, bubble) {
           `这种迎难而上的勇气，比答案本身更了不起！小圆为你骄傲！🌟`
         );
         triggerInsightEffect();
+        Sound.play("victory");
         if (data.xp_reward) {
           toast(`🏆 挑战成功 +${data.xp_reward} XP！`, 3000);
         }
@@ -612,6 +628,7 @@ async function consumeSSE(resp, bubble) {
         handlePetFeedSSE(data);
       } else if (type === "level_complete") {
         // V3.0 P2 模块D：冒险关卡自动通关 → 全局通关弹窗
+        Sound.play("victory");
         if (window.AdventureView) window.AdventureView.showComplete(data);
       } else if (type === "mode_hint") {
         // V3.0 P0: 孩子表达学习意图后，才展示模式快捷栏（不强制、自然发生）
@@ -1818,15 +1835,24 @@ if (window.AdventureView) window.AdventureView.init();
 if (window.CoCreation) window.CoCreation.init();
 if (window.PBLView) {
   window.PBLView.init();
-  // 挂载导弹模拟器：renderFn(box, simulatorConfig)，simulator_type 从 enter 响应 level 中取
   if (window.MissileProject) {
     window.PBLView.setSimulator((box, cfg) => {
       const lvl = (window.PBLView._levelData && window.PBLView._levelData.level) || {};
       const type = lvl.simulator_type || "missile_level1";
-      window.MissileProject.mountSimulator(box, type, cfg);
+      if (String(type).indexOf("building_") === 0) {
+        if (window.BuildingProject) window.BuildingProject.mountSimulator(box, type, cfg);
+      } else {
+        window.MissileProject.mountSimulator(box, type, cfg);
+      }
     });
-    // 模拟器命中 → 通关上报 → PBL 结算
     window.MissileProject.setCompleteHandler(payload => {
+      if (window.PBLView.currentProjectId && window.PBLView.currentLevelId) {
+        window.PBLView.submitComplete(window.PBLView.currentProjectId, window.PBLView.currentLevelId, payload);
+      }
+    });
+  }
+  if (window.BuildingProject) {
+    window.BuildingProject.setCompleteHandler(payload => {
       if (window.PBLView.currentProjectId && window.PBLView.currentLevelId) {
         window.PBLView.submitComplete(window.PBLView.currentProjectId, window.PBLView.currentLevelId, payload);
       }

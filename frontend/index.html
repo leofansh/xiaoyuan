@@ -13,6 +13,7 @@
 <link rel="stylesheet" href="/css/pbl.css?v=2">
 <link rel="stylesheet" href="/css/co-creation.css?v=1">
 <link rel="stylesheet" href="/css/missile.css?v=1">
+<link rel="stylesheet" href="/css/building.css?v=1">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
@@ -256,6 +257,18 @@
       </label>
     </div>
 
+    <!-- V3.0: 音效开关 -->
+    <div class="apikey-row" style="margin-top:14px;justify-content:space-between">
+      <div>
+        <div style="font-size:14px;font-weight:600" data-i18n="settings.sound">🔊 音效</div>
+        <div style="font-size:12px;color:var(--muted)" data-i18n="settings.soundHint">连击、卡片、顿悟时的提示音</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="sound-toggle">
+        <span class="slider"></span>
+      </label>
+    </div>
+
     <button id="btn-settings-close" class="btn-primary" style="margin-top:16px" data-i18n="settings.close">就用这个啦 ✨</button>
   </div>
 </div>
@@ -301,17 +314,20 @@
 <div id="toast" class="toast hidden"></div>
 
 <script src="/js/i18n.js"></script>
+<script src="/js/sound.js?v=1"></script>
 <script src="/js/visuals/numberline.js?v=1"></script>
 <script src="/js/visuals/segment.js?v=1"></script>
 <script src="/js/math.js?v=2"></script>
-<script src="/js/pet.js?v=2"></script>
-<script src="/js/cards.js?v=2"></script>
-<script src="/js/combo.js?v=2"></script>
+<script src="/js/pet.js?v=3"></script>
+<script src="/js/cards.js?v=3"></script>
+<script src="/js/combo.js?v=3"></script>
 <script src="/js/adventure.js?v=1"></script>
 <script src="/js/pbl.js?v=2"></script>
 <script src="/js/simulators/missile.js?v=3"></script>
 <script src="/js/pbl-missile.js?v=1"></script>
+<script src="/js/simulators/building.js?v=1"></script>
+<script src="/js/pbl-building.js?v=1"></script>
 <script src="/js/co-creation.js?v=1"></script>
-<script src="/js/app.js?v=22"></script>
+<script src="/js/app.js?v=24"></script>
 </body>
 </html>

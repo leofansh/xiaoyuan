@@ -83,6 +83,8 @@
     "settings.customModel": "模型名",
     "settings.pureMode": "🧘 纯学习模式",
     "settings.pureModeHint": "关闭趣味动画与游戏化提示，只保留最纯粹的学习对话",
+    "settings.sound": "🔊 音效",
+    "settings.soundHint": "连击、卡片、顿悟时的提示音",
 
     "insight.title": "✨ 顿悟时刻",
     "insight.quote": "你自己想通了！",
@@ -199,6 +201,8 @@
     "settings.customModel": "Model Name",
     "settings.pureMode": "🧘 Pure Study Mode",
     "settings.pureModeHint": "Disable fun animations & gamified hints, keep only pure learning dialogue",
+    "settings.sound": "🔊 Sound effects",
+    "settings.soundHint": "Tones for combo, cards, and insight moments",
 
     "insight.title": "✨ Insight Moment",
     "insight.quote": "You figured it out yourself!",

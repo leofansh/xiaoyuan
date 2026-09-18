@@ -124,6 +124,7 @@ async function exchangeSkin(skinId) {
 /* ---------------- CardRevealModal：SSE card_drop 掉落动画 ---------------- */
 function handleCardDropSSE(data) {
   if (!data || !data.card) return;
+  Sound.play("card");
   showCardReveal(data);
   // 收藏墙已显示则刷新
   const section = $("#cards-section");
@@ -161,6 +162,7 @@ function showCardReveal(data) {
     : `第 ${(data.duplicate_count || 0) + 1} 张 · 已转化为 ${data.starlight_gained || 0} 星光（当前余额 ${data.starlight_total || 0}）`;
   overlay.onclick = closeCardDrop;
   if (rarity === "epic" || rarity === "legendary") {
+    Sound.play("victory");
     celebrate();
     toast(`💎 掉落了${CARD_RARITY_LABEL[rarity]}卡「${card.name}」！`, 3000);
   }

@@ -76,6 +76,7 @@ function handlePetFeedSSE(data) {
   }
 
   if (leveledUp) {
+    Sound.play("level_up");
     showPetLevelUpModal({
       oldLevel: prevPet ? prevPet.level : null,
       newLevel: pet ? pet.level : null,
