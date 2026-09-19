@@ -45,6 +45,23 @@ class MathContextTest(unittest.TestCase):
             INTEREST_MATH_CONTEXTS["音乐"]["contexts"][0],
         )
 
+    def test_all_interests_have_at_least_five_contexts(self):
+        for interest, info in INTEREST_MATH_CONTEXTS.items():
+            self.assertGreaterEqual(
+                len(info["contexts"]), 5,
+                f"{interest} 应有至少 5 条情境，当前 {len(info['contexts'])} 条",
+            )
+
+    def test_new_contexts_reachable_for_matching_topic(self):
+        for interest in ("烘焙", "游戏"):
+            info = INTEREST_MATH_CONTEXTS[interest]
+            topic = info["topics"][0]
+            self.assertIsNotNone(get_math_context_for_interest(interest, topic))
+            new_contexts = info["contexts"][3:5]
+            self.assertEqual(len(new_contexts), 2)
+            for ctx in new_contexts:
+                self.assertTrue(ctx.strip().endswith("？"), f"{interest} 新情境应以问号结尾")
+
 
 class ExtractInterestsTest(unittest.TestCase):
     def test_extract_new_interests(self):
