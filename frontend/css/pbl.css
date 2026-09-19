@@ -198,6 +198,20 @@
 }
 .pbl-enter-btn:hover { transform: translateY(-2px); box-shadow: var(--hover-shadow); }
 
+.pbl-reset-btn {
+  margin-top: 10px;
+  border: 1px solid rgba(255, 94, 98, .5);
+  background: transparent;
+  color: #e0555a;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s, background .15s;
+}
+.pbl-reset-btn:hover { background: rgba(255, 94, 98, .08); transform: translateY(-1px); }
+
 /* ---------------- 关卡视图（PBLLevelView） ---------------- */
 .pbl-level-head { margin-bottom: 12px; }
 .pbl-level-title { font-size: 18px; font-weight: 800; color: #5a4a4d; }
@@ -347,6 +361,14 @@
 .pbl-reward-card {
   color: #fff;
   background: linear-gradient(135deg, #9b59b6, #7d3c98);
+}
+.pbl-reward-note {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--chip-bg);
+  border-radius: 12px;
+  padding: 7px 14px;
 }
 .pbl-knowledge {
   font-size: 12px;

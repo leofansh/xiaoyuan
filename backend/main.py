@@ -1272,6 +1272,10 @@ class PblChoice(BaseModel):
     option_id: str = ""
 
 
+class PblReset(BaseModel):
+    student_id: str = ""
+
+
 class CustomProjectCreate(BaseModel):
     name: str = ""
     origin_interest: str = ""
@@ -1454,6 +1458,25 @@ async def pbl_complete(project_id: str, payload: PblComplete):
         s = _load_student(sid)
         s.pbl_projects = ensure_pbl(s.pbl_projects)
         result = complete_level(s, project_id, payload.level_id, payload.score, payload.hit, payload.attempts)
+        if result.get("success"):
+            storage.save(s)
+        return result
+
+
+@app.post("/api/pbl/projects/{project_id}/reset")
+async def pbl_reset(project_id: str, payload: PblReset):
+    """7.3.5 项目重新开始：清空该项目进度回到 Lv.1（已发奖励不重复发放）。"""
+    from backend.pbl.pbl_service import ensure_pbl, reset_project
+
+    sid = payload.student_id or ""
+    if not sid:
+        raise HTTPException(status_code=400, detail="缺少 student_id")
+    storage = get_storage()
+    lock = storage.get_lock(sid)
+    async with lock:
+        s = _load_student(sid)
+        s.pbl_projects = ensure_pbl(s.pbl_projects)
+        result = reset_project(s, project_id)
         if result.get("success"):
             storage.save(s)
         return result

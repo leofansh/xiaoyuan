@@ -139,7 +139,10 @@ window.PBLView = {
     overlay.querySelector(".pbl-complete-title").textContent =
       (data && data.project_completed) ? "🎉 项目全部通关！" : "关卡通过！";
     overlay.querySelector(".pbl-complete-message").innerHTML = fmt(data && data.message);
-    overlay.querySelector(".pbl-rewards").innerHTML = renderRewards(data && data.rewards);
+    // 重开后的补玩不重复发奖，给一个温和的说明
+    overlay.querySelector(".pbl-rewards").innerHTML = (data && data.replayed)
+      ? '<div class="pbl-rewards-row"><span class="pbl-reward-note">🔄 重玩通关 · 不重复发奖</span></div>'
+      : renderRewards(data && data.rewards);
     const knowledge = overlay.querySelector(".pbl-knowledge");
     if (data && data.knowledge_summary) {
       knowledge.classList.remove("hidden");
@@ -382,6 +385,9 @@ function renderProjectDetail(data) {
   const project = (data && data.project) || data || {};
   const levels = (data && data.levels) || project.levels || [];
   const coverage = project.knowledge_coverage || [];
+  const progress = (data && data.progress) || {};
+  // 有进度才显示"重新开始"（可重玩/重开），全新项目无需重置
+  const hasProgress = (progress.completed_levels || 0) > 0;
   return `
     <button class="pbl-back" data-pbl-action="back-list">← 返回项目列表</button>
     <div class="pbl-hero">
@@ -394,6 +400,7 @@ function renderProjectDetail(data) {
           ${project.estimated_time ? `<span class="pbl-meta">⏱ ${escapeHtmlSafe(project.estimated_time)}</span>` : ""}
           ${project.grade_range ? `<span class="pbl-meta">🎓 ${escapeHtmlSafe(project.grade_range)}</span>` : ""}
         </div>
+        ${hasProgress ? `<button class="pbl-reset-btn" data-pbl-action="reset-project" data-id="${escapeHtmlSafe(project.id)}">🔄 重新开始</button>` : ""}
       </div>
     </div>
     <h4 class="pbl-sub-title">🗺 关卡</h4>
@@ -606,6 +613,29 @@ async function answerChoice(choiceId, optionId) {
   }
 }
 
+/* 重新开始项目：二次确认后调用后端重置，回到 Lv.1（已发奖励保留、不重复发放） */
+async function confirmResetProject(projectId) {
+  const sid = getPblStudentId();
+  if (!sid || !projectId) return;
+  const info = window.PBLView._currentProject || {};
+  const name = info.name || "这个项目";
+  const ok = confirm(
+    `确定要重新开始「${name}」吗？\n\n进度、星级和剧情选择都会被清空，重新从 Lv.1 开始。\n已获得的 XP 和卡片会保留，重玩不会再获得重复奖励。`
+  );
+  if (!ok) return;
+  try {
+    const res = await pblFetch(`/api/pbl/projects/${projectId}/reset`, { student_id: sid });
+    if (res && res.success === false) {
+      pblToast(res.message || "重新开始失败，再试一次？");
+      return;
+    }
+    pblToast(res.message || "已重新开始！");
+    window.PBLView.loadDetail(projectId);
+  } catch (e) {
+    pblToast("重新开始失败：" + (e.message || "网络开小差了"));
+  }
+}
+
 /* ================================================================
    事件绑定
    ================================================================ */
@@ -633,6 +663,9 @@ function bindPblEvents() {
         break;
       case "enter-level":
         window.PBLView.enterLevel(window.PBLView.currentProjectId, id);
+        break;
+      case "reset-project":
+        confirmResetProject(id);
         break;
       case "send":
         handleLevelSend();

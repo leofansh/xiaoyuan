@@ -43,6 +43,7 @@ def _new_project_record(project_id: str) -> dict:
         "completed_levels": [],
         "level_states": {},
         "choices_answered": {},
+        "rewarded_levels": [],  # 已发放奖励的关卡 id：重开后不重复发奖（规格 7.2.1 扩展）
         "total_time_spent": 0,
         "started_at": datetime.now().isoformat(timespec="seconds"),
         "completed_at": None,
@@ -56,11 +57,17 @@ def _completed_level_ids(record: dict, total: int) -> list[int]:
 
 
 def _project_status(record: dict | None, total: int) -> str:
-    """项目状态：无记录→available；全完成→completed；否则→in_progress。"""
+    """项目状态：无记录或零进度→available；全完成→completed；否则→in_progress。
+
+    零进度（重新开始后的空记录）显示"可开始"而非"进行中"。
+    """
     if record is None:
         return "available"
-    if len(_completed_level_ids(record, total)) >= total:
+    completed = _completed_level_ids(record, total)
+    if len(completed) >= total:
         return "completed"
+    if not completed:
+        return "available"
     return "in_progress"
 
 
@@ -408,27 +415,37 @@ def complete_level(student, project_id: str, level_id: int,
     next_unlocked = level_id < total
     project_completed = len(completed) >= total
 
-    # 奖励：宠物 XP
-    rewards_xp = level.get("rewards", {}).get("xp", 0)
-    xp_result = add_xp(ensure_pet(getattr(student, "pet", None)), rewards_xp, source="pbl_level")
-    student.pet = xp_result["pet"]
+    # 重新开始后的补玩：本关此前已发过奖励 → 只记星级，不重复发 XP/卡片/掌握度，
+    # 防止反复重开刷奖励、刷掌握度
+    rewarded_levels = record.setdefault("rewarded_levels", [])
+    replayed = level_id in rewarded_levels
+    if replayed:
+        rewards_xp = 0
+        card_dropped = None
+    else:
+        # 奖励：宠物 XP
+        rewards_xp = level.get("rewards", {}).get("xp", 0)
+        xp_result = add_xp(ensure_pet(getattr(student, "pet", None)), rewards_xp, source="pbl_level")
+        student.pet = xp_result["pet"]
 
-    # 奖励：卡片（库中直接发放，否则随机掉落一张）
-    student.cards = ensure_cards(getattr(student, "cards", None))
-    card_id = level.get("rewards", {}).get("card")
-    card_dropped = _grant_card(student.cards, card_id)
-    if card_dropped is None:
-        drop_result = drop_card(student.cards, source="pbl")
-        if drop_result.get("dropped"):
-            card_dropped = {"card": drop_result["card"], "is_new": drop_result["is_new"]}
+        # 奖励：卡片（库中直接发放，否则随机掉落一张）
+        student.cards = ensure_cards(getattr(student, "cards", None))
+        card_id = level.get("rewards", {}).get("card")
+        card_dropped = _grant_card(student.cards, card_id)
+        if card_dropped is None:
+            drop_result = drop_card(student.cards, source="pbl")
+            if drop_result.get("dropped"):
+                card_dropped = {"card": drop_result["card"], "is_new": drop_result["is_new"]}
 
-    # 知识回溯：更新掌握度
-    _apply_knowledge(student, level)
+        # 知识回溯：更新掌握度
+        _apply_knowledge(student, level)
+        rewarded_levels.append(level_id)
 
     return {
         **base,
         "stars_earned": stars,
-        "rewards": {"xp": rewards_xp, "card_dropped": card_dropped},
+        "rewards": None if replayed else {"xp": rewards_xp, "card_dropped": card_dropped},
+        "replayed": replayed,
         "next_level_unlocked": next_unlocked,
         "project_completed": project_completed,
         "knowledge_summary": _knowledge_summary(level),
@@ -460,3 +477,40 @@ def project_knowledge(student, project_id: str, level_id: int) -> dict:
     level_name = level.get("name", f"Lv.{level_id}")
     summary = f"你刚刚完成了「{level_name}」，用到了：" + "、".join(names) + "。" if names else f"你刚刚完成了「{level_name}」。"
     return {"level_id": level_id, "knowledge_points": points, "summary": summary}
+
+
+# ---------------------------------------------------------------------------
+# 重新开始（规格 7.2.1 扩展）
+# ---------------------------------------------------------------------------
+
+
+def reset_project(student, project_id: str) -> dict:
+    """项目重新开始：清空该项目进度，回到 Lv.1 从零重打。
+
+    语义：
+    - 进度、星级、最佳分、剧情选择全部清空，项目回到"可开始"状态；
+    - 已发放的奖励（XP/卡片/掌握度）不回收，且重玩不再重复发放：
+      ``rewarded_levels`` 跨重置保留，重打已领过奖的关卡只记星级；
+    - 旧档案无 rewarded_levels 时按已完成关卡兜底，避免升级后重开刷奖。
+    """
+    project = get_project(project_id)
+    if project is None:
+        return {"success": False, "message": "项目不存在"}
+
+    pbl = ensure_pbl(getattr(student, "pbl_projects", None))
+    student.pbl_projects = pbl
+    projects = pbl.setdefault("projects", {})
+    old = projects.get(project_id)
+    if not old:
+        return {"success": False, "message": "项目尚未开始，无需重新开始"}
+
+    record = _new_project_record(project_id)
+    record["rewarded_levels"] = list(
+        old.get("rewarded_levels") or old.get("completed_levels") or []
+    )
+    projects[project_id] = record
+    return {
+        "success": True,
+        "message": "好，我们重新开始！进度已重置，从 Lv.1 出发吧～",
+        "restarted": True,
+    }
