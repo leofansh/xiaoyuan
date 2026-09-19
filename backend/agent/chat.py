@@ -10,7 +10,12 @@ logger = logging.getLogger(__name__)
 
 from backend.agent import assessment, persona
 from backend.agent.metacognition import detect_strategy, get_strategy_prompt
-from backend.config import MAX_HISTORY_MESSAGES, SESSION_DEEP_MINUTES, get_pure_mode
+from backend.config import (
+    MAX_HISTORY_TURNS,
+    MAX_HISTORY_TOKENS,
+    SESSION_DEEP_MINUTES,
+    get_pure_mode,
+)
 from backend.models.student import Badge, SessionSummary, Student, StudentProfile
 from backend.services import llm
 from backend.services.content_filter import filter_llm_output
@@ -20,6 +25,7 @@ from backend.services.teaching_journal import (
     generate_insights, get_relevant_insights, record_misunderstanding,
 )
 from backend.services.wellbeing import check_time_limit
+from backend.services.history_manager import trim_history
 from backend.services.interest_extractor import extract_interests, personalized_opening
 from backend.services.storage import StudentStorage, get_storage
 from backend.services.ab_testing import get_ab_test_group
@@ -783,8 +789,8 @@ async def process_message(
         if _uc_reply:
             sess.history.append({"role": "user", "content": user_message})
             sess.history.append({"role": "assistant", "content": _uc_reply})
-            if len(sess.history) > MAX_HISTORY_MESSAGES * 2:
-                sess.history = sess.history[-MAX_HISTORY_MESSAGES * 2 :]
+            if len(sess.history) > MAX_HISTORY_TURNS * 2:
+                sess.history = sess.history[-MAX_HISTORY_TURNS * 2 :]
             sess.turn_count += 1
             storage.save(student)
             yield {"type": "text", "content": _uc_reply}
@@ -926,8 +932,8 @@ async def process_message(
                 # 短路输出：确认流程话术（不发 LLM、不做评估，规格 L.2）
                 sess.history.append({"role": "user", "content": user_message})
                 sess.history.append({"role": "assistant", "content": understand_reply})
-                if len(sess.history) > MAX_HISTORY_MESSAGES * 2:
-                    sess.history = sess.history[-MAX_HISTORY_MESSAGES * 2 :]
+                if len(sess.history) > MAX_HISTORY_TURNS * 2:
+                    sess.history = sess.history[-MAX_HISTORY_TURNS * 2 :]
                 sess.turn_count += 1
                 storage.save(student)
                 yield {"type": "text", "content": understand_reply}
@@ -1144,7 +1150,8 @@ async def process_message(
     # V-P0-2：计算验证器（LLM 算错自动修正，Function Calling 兜底）
     from backend.services.calc_verifier import verify_and_fix
 
-    history = sess.history[-MAX_HISTORY_MESSAGES:]
+    # H3：对话历史 token 管理——裁剪历史后再传入 LLM（轮数 + token 预算 + 摘要兜底）
+    history = trim_history(sess.history, max_turns=MAX_HISTORY_TURNS, max_tokens=MAX_HISTORY_TOKENS)
 
     # V-P0-1：改用"缓冲 → 过滤/验证 → 模拟流式"模式，保证不适合内容不暴露
     full_reply = ""
@@ -1331,8 +1338,8 @@ async def process_message(
     # 更新历史
     sess.history.append({"role": "user", "content": user_message})
     sess.history.append({"role": "assistant", "content": reply_text})
-    if len(sess.history) > MAX_HISTORY_MESSAGES * 2:
-        sess.history = sess.history[-MAX_HISTORY_MESSAGES * 2 :]
+    if len(sess.history) > MAX_HISTORY_TURNS * 2:
+        sess.history = sess.history[-MAX_HISTORY_TURNS * 2 :]
     sess.turn_count += 1
 
     # V-P1-4：从学生消息中提取新兴趣并保存

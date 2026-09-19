@@ -16,6 +16,12 @@ FRONTEND_DIR = BASE_DIR / "frontend"
 CONFIG_FILE = BASE_DIR / "data" / "config.json"
 
 MAX_HISTORY_MESSAGES = 10
+# 架构优化 P3 项 H3：对话历史 token 管理
+#   MAX_HISTORY_MESSAGES 保留（历史消息条数上限，兼容既有引用）
+#   MAX_HISTORY_TURNS   对话历史最大保留轮数（1 轮 = user+assistant 或单条 user）
+#   MAX_HISTORY_TOKENS  传入 LLM 的历史最大估算 token 预算
+MAX_HISTORY_TURNS = 20
+MAX_HISTORY_TOKENS = 6000
 SESSION_DEEP_MINUTES = 15
 SESSION_BASELINE_MINUTES = 5
 
