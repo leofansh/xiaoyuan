@@ -100,18 +100,21 @@ def schedule_delayed_check(
     topic_id: str,
     topic_name: str = "",
     claimed_at: str | None = None,
+    days: int = 1,
 ) -> bool:
-    """费曼检查通过时登记次日延迟验证任务（L.4.1）。
+    """登记延迟验证任务（L.4.1 次日验证 / H1 掌握度 7 天验证，共用同一排期逻辑）。
 
     在 student.review_schedules 中创建/更新一条延迟验证计划：
-    - next_review = 明天（次日开场 30 秒验证）
+    - next_review = today + timedelta(days=days)（缺省为次日开场 30 秒验证）
+    - interval_days = days
     - delayed_check = True（标识验证题 = 复习题）
 
     Args:
         student: 学生档案
-        topic_id: 通过费曼检查的知识点
+        topic_id: 通过费曼检查（或掌握达标）的知识点
         topic_name: 知识点名称（回退到 syllabus）
         claimed_at: 首次声称掌握时间（ISO；缺省为当前时间）
+        days: 验证间隔天数（缺省 1，即次日延迟验证；H1 掌握验证用 7）
 
     Returns:
         是否成功登记。
@@ -125,18 +128,18 @@ def schedule_delayed_check(
         return False
     name = topic_name or node.name
     claimed = claimed_at or datetime.now().isoformat(timespec="seconds")
-    tomorrow = (datetime.now().date() + timedelta(days=1)).isoformat()
+    review_date = (datetime.now().date() + timedelta(days=days)).isoformat()
 
     existing = next(
         (rs for rs in student.review_schedules if rs.topic_id == topic_id),
         None,
     )
     if existing:
-        # 已有计划：升级为延迟验证，覆盖为明天（立即验证比原间隔优先）
+        # 已有计划：升级为延迟验证，覆盖为 days 天后的验证日（防重，不新建排期）
         existing.delayed_check = True
         existing.claimed_at = claimed
-        existing.next_review = tomorrow
-        existing.interval_days = 1
+        existing.next_review = review_date
+        existing.interval_days = days
         return True
 
     from backend.models.student import ReviewSchedule
@@ -145,8 +148,8 @@ def schedule_delayed_check(
         ReviewSchedule(
             topic_id=topic_id,
             topic_name=name,
-            next_review=tomorrow,
-            interval_days=1,
+            next_review=review_date,
+            interval_days=days,
             review_count=0,
             last_reviewed="",
             mastery_at_schedule=student.mastery_score(topic_id, 0.0),
@@ -155,6 +158,24 @@ def schedule_delayed_check(
         )
     )
     return True
+
+
+def schedule_verification(student, topic_id: str, topic_name: str = "") -> bool:
+    """掌握达标登记 7 天验证（H1）。
+
+    知识点掌握度从 <0.7 跨越到 >=0.7 时调用，复用 schedule_delayed_check 的排期
+    与防重逻辑（days=7）：7 天后开场出一道检索练习题验证"真掌握"。
+    已存在未结算的排期时由 schedule_delayed_check 内部防重（升级而非新建）。
+
+    Args:
+        student: 学生档案
+        topic_id: 掌握达标的知识点
+        topic_name: 知识点名称（回退到 syllabus）
+
+    Returns:
+        是否成功登记。
+    """
+    return schedule_delayed_check(student, topic_id, topic_name, days=7)
 
 
 def get_due_delayed_checks(student):
@@ -173,6 +194,20 @@ def get_due_delayed_checks(student):
         rs for rs in student.review_schedules
         if rs.delayed_check and rs.next_review and rs.next_review <= today
     ]
+
+
+def get_due_verifications(student) -> list:
+    """取今天到期的掌握验证任务（H1）。
+
+    get_due_delayed_checks 的增强：同取全部 delayed_check 且到期的排期，
+    覆盖 1 天延迟验证与 7 天掌握验证两类，并按 next_review 升序排序
+    （同一天内先到期的优先出题）。
+
+    Returns:
+        到期验证任务列表（ReviewSchedule，按 next_review 排序）。
+    """
+    due = get_due_delayed_checks(student)
+    return sorted(due, key=lambda rs: rs.next_review)
 
 
 def record_delayed_check_result(student, topic_id: str, success: bool) -> dict:
@@ -274,5 +309,26 @@ def record_delayed_check_result(student, topic_id: str, success: bool) -> dict:
         ))
         if len(student.teaching_journal) > 50:
             student.teaching_journal = student.teaching_journal[-50:]
+
+        # H1：验证失败补概念性遗忘 Gap（同知识点已有 open gap 则跳过，避免重复叠加）
+        from backend.models.student import Gap
+
+        _has_open_gap = any(
+            g.topic_id == topic_id and g.status in ("open", "recurring")
+            for g in student.gaps
+        )
+        if not _has_open_gap:
+            student.gaps.append(Gap(
+                topic_id=topic_id,
+                topic_name=rs.topic_name if rs else topic_id,
+                type="concept",
+                category="concept_forgetting",
+                root_cause="7天掌握验证失败：间隔后无法稳定提取，判定为概念性遗忘",
+                repair_strategy="重讲概念要点 + 变式题复测，重置记忆表征",
+                status="open",
+                evidence="delayed_check_result=false",
+                last_occurred=today[:10],
+                occurrence_count=1,
+            ))
 
     return result

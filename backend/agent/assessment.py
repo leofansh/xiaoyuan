@@ -68,7 +68,7 @@ def apply_eval(student: Student, eval_data: dict, *, suppress_combo: bool = Fals
     new_badges: list[str] = []
 
     # 1. 掌握度更新（贝叶斯增量更新，B1）
-    from backend.services.mastery_tracker import update_mastery
+    from backend.services.mastery_tracker import schedule_verification, update_mastery
 
     mastery_updates = eval_data.get("mastery_updates") or {}
     independent_success = eval_data.get("independent_success") is True
@@ -93,6 +93,8 @@ def apply_eval(student: Student, eval_data: dict, *, suppress_combo: bool = Fals
         student.mastery[topic_id] = new_rec
         if old_score < 0.7 <= new_rec.score:
             newly_mastered.append(topic_id)
+            # H1：掌握达标 → 登记 7 天后掌握验证（复用排期防重逻辑）
+            schedule_verification(student, topic_id)
 
         # BKT 中观测接入：每知识点 correct = (score >= 0.6)（知识点级评分，规避一轮刷 N 点）
         if bkt_answer_round:

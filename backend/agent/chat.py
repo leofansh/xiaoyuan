@@ -39,6 +39,25 @@ _INTRINSIC_POSITIVE_FEEDBACK = [
 _MOOD_AVATAR = {"😊": "happy", "😐": "calm", "😣": "tired"}
 
 
+def _delayed_check_settles(eval_data: dict | None, topic_id: str) -> bool:
+    """延迟验证结算校验（H1）。
+
+    仅当本轮 eval 的 mastery_updates 中包含验证题对应知识点（即学生本轮
+    确实作答了该验证题）才允许结算，防止"下一轮任意作答误结算"。
+
+    Args:
+        eval_data: 本轮 LLM 评估块
+        topic_id: 当前延迟验证的知识点
+
+    Returns:
+        是否应结算。
+    """
+    if not topic_id:
+        return False
+    updates = (eval_data or {}).get("mastery_updates") or {}
+    return topic_id in updates
+
+
 def _derive_avatar_emotion(eval_data: dict | None, new_badges: list | None = None) -> str:
     """从小圆（AI 助教）视角派生头像表情 avatar_emotion。
 
@@ -156,15 +175,22 @@ def start_session(student: Student, mood: str, source: str = "主动打开") -> 
             except (ValueError, KeyError, TypeError):
                 pass
 
-    # V3.0 模块 L.4.1：延迟验证开场（昨天费曼检查通过的知识点，今天 30 秒热身验证）
+    # V3.0 模块 L.4.1 + H1：延迟验证/掌握验证开场检查
+    # get_due_verifications 是 get_due_delayed_checks 的增强（含 1 天延迟验证与
+    # 7 天掌握验证两类，按到期日排序），此处统一消费，避免同一知识点重复出题。
     # 复用间隔复习调度器：验证题 = 复习题。有到期任务时优先呈现（先于复习提示）。
-    if not pure_mode:
-        try:
-            from backend.services.mastery_tracker import get_due_delayed_checks
-            from backend.services.repetition import generate_retrieval_question
-            _due_dc = get_due_delayed_checks(student)
-            if _due_dc:
-                _rc = _due_dc[0]
+    try:
+        from backend.services.mastery_tracker import get_due_verifications
+        from backend.services.repetition import generate_retrieval_question
+        _due_vf = get_due_verifications(student)
+        # H1：残留字段清理——当前验证知识点若已无到期排期则清空（跨会话残留 bug）
+        if sess.delayed_check_topic_id and not any(
+            rs.topic_id == sess.delayed_check_topic_id for rs in _due_vf
+        ):
+            sess.delayed_check_topic_id = ""
+        if not pure_mode:
+            if _due_vf:
+                _rc = _due_vf[0]
                 _q = generate_retrieval_question(student, _rc.topic_id)
                 if _q:
                     sess.delayed_check_topic_id = _rc.topic_id
@@ -173,8 +199,8 @@ def start_session(student: Student, mood: str, source: str = "主动打开") -> 
                         f"今天我们 30 秒热个身——{_q}\n"
                         "（不用有压力，试试就好～）"
                     )
-        except ImportError:
-            pass
+    except ImportError:
+        pass
 
     return {
         "opening": opening,
@@ -1245,13 +1271,14 @@ async def process_message(
             yield ev
 
         # V3.0 模块 L.4.1：延迟验证结算（开场 30 秒热身作答后）
-        # 孩子作答完毕、eval 给出独立成功判定 → 结算昨日声称掌握的验证任务
+        # 孩子作答完毕、eval 给出独立成功判定 → 结算昨日声称掌握的验证任务。
+        # H1 校验：仅当本轮 mastery_updates 含该知识点才结算（防止任意作答误结算）。
         if not pure_mode and sess.delayed_check_topic_id:
+            _dc_topic = sess.delayed_check_topic_id
             _dc_ind = eval_data.get("independent_success")
-            if isinstance(_dc_ind, bool):
+            if _delayed_check_settles(eval_data, _dc_topic) and isinstance(_dc_ind, bool):
                 from backend.services.mastery_tracker import record_delayed_check_result
 
-                _dc_topic = sess.delayed_check_topic_id
                 sess.delayed_check_topic_id = ""
                 res = record_delayed_check_result(student, _dc_topic, success=_dc_ind)
                 if not _dc_ind:

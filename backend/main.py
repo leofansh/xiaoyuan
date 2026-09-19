@@ -377,6 +377,7 @@ class ApiKeyUpdate(BaseModel):
     api_key: str = ""
     pure_mode: bool | None = None  # V3.0 P0：纯学习模式开关（可单独提交）
     card_drop_rates: dict | None = None  # V3.0 13.9.4：卡片掉落概率（可单独提交）
+    ab_test: dict | None = None  # 设计方案 98：A/B 测试开关与比例（可单独提交）
 
 
 # ---------------------------------------------------------------------------
@@ -527,7 +528,13 @@ async def test_llm_connection(payload: LLMTestRequest):
 def get_config():
     key = config.get_api_key()
     masked = (key[:7] + "****" + key[-4:]) if len(key) > 12 else ("****" if key else "")
-    return {"api_key_masked": masked, "has_key": bool(key), "pure_mode": config.get_pure_mode(), "card_drop_rates": config.get_card_drop_rates()}
+    return {
+        "api_key_masked": masked,
+        "has_key": bool(key),
+        "pure_mode": config.get_pure_mode(),
+        "card_drop_rates": config.get_card_drop_rates(),
+        "ab_test": config.get_ab_test_config(),
+    }
 
 
 @app.post("/api/config")
@@ -539,6 +546,9 @@ def update_config(payload: ApiKeyUpdate):
     if payload.card_drop_rates is not None:
         rates = config.set_card_drop_rates(payload.card_drop_rates)
         return {"ok": True, "message": "卡片掉落概率已更新", "card_drop_rates": rates}
+    if payload.ab_test is not None:
+        normalized = config.set_ab_test_config(payload.ab_test)
+        return {"ok": True, "message": "A/B 测试配置已更新", "ab_test": normalized}
     key = payload.api_key.strip()
     if not key:
         raise HTTPException(status_code=400, detail="API Key 不能为空")
