@@ -638,8 +638,8 @@ async def chat_image(
         if not data:
             raise HTTPException(status_code=400, detail="照片是空的")
 
-        if not ocr_service.is_available():
-            raise HTTPException(status_code=501, detail="OCR模块未安装，请联系管理员安装paddleocr")
+        if not ocr_service.is_any_available():
+            raise HTTPException(status_code=501, detail="图片识别不可用：请配置 DeepSeek API Key 或安装 rapidocr-onnxruntime")
 
         try:
             suffix = ocr_service.safe_suffix(file.filename, file.content_type)

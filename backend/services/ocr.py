@@ -12,6 +12,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from backend import config
 from backend.config import OCR_ENABLE_FORMULA
 
 _engine: Any = None
@@ -24,6 +25,11 @@ def is_available() -> bool:
         return True
     except Exception:  # noqa: BLE001
         return False
+
+
+def is_any_available() -> bool:
+    """任一识别引擎可用即视为可用：vision API Key 存在 或 rapidocr 可导入。"""
+    return bool(config.get_api_key()) or is_available()
 
 
 def _get_engine() -> Any:

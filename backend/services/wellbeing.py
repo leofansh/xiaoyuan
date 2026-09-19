@@ -9,6 +9,7 @@ F2 改进：
 
 from datetime import datetime
 
+from backend.config import load_prompts
 from backend.models.student import Student
 
 # 配置（未来可由家长端设置，当前用默认值）
@@ -18,6 +19,27 @@ NIGHT_END_HOUR = 6            # 夜间限制结束
 HIGH_LOAD_BREAK_MINUTES = 25  # 高认知负荷提醒休息
 MEDIUM_LOAD_BREAK_MINUTES = 40
 LOW_LOAD_BREAK_MINUTES = 60
+
+
+def _break_thresholds() -> dict[str, int]:
+    """读取 prompts.yaml 防沉迷阈值（YAML 优先，代码常量兜底，架构优化 I2）。
+
+    三档分钟数映射：
+    - high      → HIGH_LOAD_BREAK_MINUTES（高认知负荷）
+    - normal    → MEDIUM_LOAD_BREAK_MINUTES（中认知负荷）
+    - max_daily → LOW_LOAD_BREAK_MINUTES（常规峰值）
+    """
+    wb = load_prompts().get("wellbeing", {})
+
+    def _int(key: str, default: int) -> int:
+        value = wb.get(key)
+        return value if isinstance(value, int) and not isinstance(value, bool) else default
+
+    return {
+        "high": _int("high_load_break_minutes", HIGH_LOAD_BREAK_MINUTES),
+        "normal": _int("normal_break_minutes", MEDIUM_LOAD_BREAK_MINUTES),
+        "max_daily": _int("max_daily_minutes", LOW_LOAD_BREAK_MINUTES),
+    }
 
 
 def today_minutes(student: Student) -> int:
@@ -57,21 +79,22 @@ def check_break_needed(student: Student) -> str | None:
     """
     minutes = today_minutes(student)
     load = estimate_cognitive_load(student)
+    t = _break_thresholds()
 
     # 高认知负荷：25分钟就提醒
-    if load > 0.6 and minutes >= HIGH_LOAD_BREAK_MINUTES:
+    if load > 0.6 and minutes >= t["high"]:
         return (
             "这几道题挺有挑战性的，大脑已经工作25分钟了！我们休息5分钟吧，"
             "站起来走走，看看远处，让大脑充充电。"
         )
     # 中等认知负荷：40分钟提醒
-    if load > 0.3 and minutes >= MEDIUM_LOAD_BREAK_MINUTES:
+    if load > 0.3 and minutes >= t["normal"]:
         return (
             "已经学了40分钟了，做得很好！我们休息一下，喝口水，"
             "活动活动肩膀，伸个懒腰～"
         )
     # 常规：60分钟峰值结束话术
-    if minutes >= LOW_LOAD_BREAK_MINUTES:
+    if minutes >= t["max_daily"]:
         return (
             "今天到这里吧，留点悬念明天继续～每天坚持比一次学很久更有效。"
         )

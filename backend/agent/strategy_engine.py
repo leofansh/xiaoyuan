@@ -8,6 +8,8 @@ from typing import Any, Optional
 
 from pydantic import BaseModel
 
+from backend.config import load_prompts
+
 
 class TeachingStrategy(BaseModel):
     id: str
@@ -172,6 +174,28 @@ STRATEGIES: dict[str, TeachingStrategy] = {
     ),
 }
 
+# 教学策略阈值默认值（prompts.yaml 缺失/非法时的代码常量兜底，架构优化 I2）
+DEFAULT_STRATEGY_THRESHOLDS: dict[str, float] = {
+    "mastery_threshold": 0.7,             # 掌握度 >= 0.7 触发变式提升
+    "mastery_threshold_low": 0.5,         # 掌握度 < 0.5 触发脚手架提问
+    "consecutive_wrong_analogy": 2,       # 连续错 >= 2 触发类比讲解
+    "consecutive_correct_threshold": 2,   # 连续对 >= 2 触发变式提升
+    "abstract_thinking_threshold": 0.4,   # 抽象思维 < 0.4 触发类比讲解
+    "anxiety_threshold": 0.6,             # 数学焦虑 > 0.6 触发归因重构
+    "step_count_threshold": 3,            # 题目步骤 > 3 触发问题拆分
+}
+
+
+def _strategy_thresholds() -> dict[str, float]:
+    """读取 prompts.yaml 策略阈值（YAML 优先，代码常量兜底，架构优化 I2）。"""
+    params = load_prompts().get("strategy_params", {})
+    result: dict[str, float] = {}
+    for key, default in DEFAULT_STRATEGY_THRESHOLDS.items():
+        value = params.get(key)
+        result[key] = value if isinstance(value, (int, float)) and not isinstance(value, bool) else default
+    return result
+
+
 # 中文题型关键词 → 题型类别映射（从学生消息/知识点推断题型）
 _PROBLEM_TYPE_KEYWORDS: dict[str, list[str]] = {
     "equation": ["方程", "解方程", "等量关系"],
@@ -228,6 +252,7 @@ def _match_strategy(student, strategy: TeachingStrategy, problem_type: str, cont
     """计算策略匹配度（0-1）。"""
     score = 0.0
     cp = student.cognitive_profile
+    t = _strategy_thresholds()
 
     # 认知阶段匹配
     if cp.cognitive_stage in strategy.cognitive_stages:
@@ -245,19 +270,19 @@ def _match_strategy(student, strategy: TeachingStrategy, problem_type: str, cont
     mastery = context.get("mastery", 0.5)
     step_count = context.get("step_count", 1)
 
-    if strategy.id == "scaffold_questioning" and mastery < 0.5 and consecutive_wrong < 2:
+    if strategy.id == "scaffold_questioning" and mastery < t["mastery_threshold_low"] and consecutive_wrong < t["consecutive_wrong_analogy"]:
         score += 0.4
-    if strategy.id == "analogy_explanation" and consecutive_wrong >= 2 and cp.abstract_thinking < 0.4:
+    if strategy.id == "analogy_explanation" and consecutive_wrong >= t["consecutive_wrong_analogy"] and cp.abstract_thinking < t["abstract_thinking_threshold"]:
         score += 0.4
-    if strategy.id == "error_root_cause" and consecutive_wrong >= 1 and cp.abstract_thinking >= 0.4:
+    if strategy.id == "error_root_cause" and consecutive_wrong >= 1 and cp.abstract_thinking >= t["abstract_thinking_threshold"]:
         score += 0.4
     if strategy.id == "positive_reframing" and (
-        context.get("self_doubt_expression") or cp.math_anxiety > 0.6
+        context.get("self_doubt_expression") or cp.math_anxiety > t["anxiety_threshold"]
     ):
         score += 0.4
-    if strategy.id == "variant_practice" and consecutive_correct >= 2 and mastery >= 0.7:
+    if strategy.id == "variant_practice" and consecutive_correct >= t["consecutive_correct_threshold"] and mastery >= t["mastery_threshold"]:
         score += 0.4
-    if strategy.id == "decomposition" and step_count > 3:
+    if strategy.id == "decomposition" and step_count > t["step_count_threshold"]:
         score += 0.4
 
     # V3.0 P0: 动态难度

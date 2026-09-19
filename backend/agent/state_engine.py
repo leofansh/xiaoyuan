@@ -8,6 +8,26 @@ LLM 的 eval 块从"指令"降级为"建议"，最终状态转移由本引擎的
 from typing import Any, Optional
 
 from backend.agent.assessment import VALID_TRANSITIONS
+from backend.config import load_prompts
+
+
+# 状态机阈值默认值（prompts.yaml 缺失/非法时的代码常量兜底，架构优化 I2）
+DEFAULT_STATE_THRESHOLDS: dict[str, float] = {
+    "max_turns_in_state": 8,                     # 同状态停留 >= 8 轮触发熔断
+    "max_consecutive_wrong_before_fallback": 3,  # 连续错 >= 3 回退/切换讲解
+    "consecutive_correct_threshold": 2,          # 连续对 >= 2 推进
+    "mastery_threshold": 0.7,                    # 掌握度 >= 0.7 跳过中间检查
+}
+
+
+def _state_thresholds() -> dict[str, float]:
+    """读取 prompts.yaml 状态机阈值（YAML 优先，代码常量兜底，架构优化 I2）。"""
+    params = load_prompts().get("strategy_params", {})
+    result: dict[str, float] = {}
+    for key, default in DEFAULT_STATE_THRESHOLDS.items():
+        value = params.get(key)
+        result[key] = value if isinstance(value, (int, float)) and not isinstance(value, bool) else default
+    return result
 
 
 class StateTransitionResult:
@@ -51,7 +71,8 @@ def decide_next_state(
     6. 保持当前状态
     """
     # ===== 规则1：熔断（D1：同状态停留过久 → 休息建议）=====
-    if turns_in_current_state >= 8:
+    t = _state_thresholds()
+    if turns_in_current_state >= t["max_turns_in_state"]:
         if _is_valid(current, "BREAK_SUGGESTION"):
             return StateTransitionResult("BREAK_SUGGESTION", f"在 {current} 停留 {turns_in_current_state} 轮，触发休息建议", "rule")
         if _is_valid(current, "WRAP_UP"):
@@ -59,7 +80,7 @@ def decide_next_state(
         return StateTransitionResult(current, f"在 {current} 停留过久且无休息/收尾路径，保持", "keep")
 
     # ===== 规则2：连续错误 → 特殊讲解或回退（D1）=====
-    if consecutive_wrong >= 3:
+    if consecutive_wrong >= t["max_consecutive_wrong_before_fallback"]:
         # 抽象思维低 + CORE_DERIVE 连续错 → 类比讲解
         if current == "CORE_DERIVE" and abstract_thinking is not None and abstract_thinking < 0.4:
             if _is_valid(current, "ANALOGY_EXPLANATION"):
@@ -78,7 +99,7 @@ def decide_next_state(
         return StateTransitionResult(current, f"连续 {consecutive_wrong} 轮出错，保持当前状态并切换讲解策略", "keep")
 
     # ===== 规则3：连续正确 → 推进（遵循转发表）=====
-    if consecutive_correct >= 2:
+    if consecutive_correct >= t["consecutive_correct_threshold"]:
         next_map = {
             "BLIND_SPOT": "CORE_DERIVE",
             "PLAN": "CORE_DERIVE",
@@ -96,7 +117,7 @@ def decide_next_state(
             return StateTransitionResult(nxt, f"连续 {consecutive_correct} 轮正确，推进到 {nxt}", "rule")
 
     # ===== 规则4：掌握度足够 → 跳过中间检查（D1）=====
-    if current == "CORE_DERIVE" and mastery_avg is not None and mastery_avg >= 0.7:
+    if current == "CORE_DERIVE" and mastery_avg is not None and mastery_avg >= t["mastery_threshold"]:
         if _is_valid(current, "OPTIONAL_VARIANT"):
             return StateTransitionResult("OPTIONAL_VARIANT", f"掌握度 {mastery_avg:.2f} 足够，跳过例题检查直达变式", "rule")
         if _is_valid(current, "EXAMPLE_CHECK"):

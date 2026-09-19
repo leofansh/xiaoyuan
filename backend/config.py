@@ -327,3 +327,106 @@ def set_variable_rewards(vr: dict) -> dict:
     rc["variable_rewards"] = normalized
     _save_runtime_config(rc)
     return normalized
+
+
+# ============================================================
+# 架构优化 I2：配置化管理 —— prompts.yaml 加载
+# 注意：不能用 backend/config/ 目录（会与 backend/config.py 模块名遮蔽冲突），
+#       故使用 backend/configs/（复数）。
+# ============================================================
+
+_PROMPTS_FILE = Path(__file__).resolve().parent / "configs" / "prompts.yaml"
+_PROMPTS_CACHE: dict = {}
+_PROMPTS_CACHE_MTIME: float = -1.0
+
+# prompts.yaml 中 strategy_params / wellbeing 的白名单键
+# （仅保留这些键且值必须为数值；非法类型/未知键一律丢弃，由消费方用代码常量兜底默认值）
+_PROMPTS_STRATEGY_PARAM_KEYS = (
+    "max_consecutive_wrong_before_fallback",
+    "max_turns_in_state",
+    "consecutive_correct_threshold",
+    "mastery_threshold",
+    "mastery_threshold_low",
+    "consecutive_wrong_analogy",
+    "abstract_thinking_threshold",
+    "anxiety_threshold",
+    "step_count_threshold",
+)
+
+_PROMPTS_WELLBEING_KEYS = (
+    "high_load_break_minutes",
+    "normal_break_minutes",
+    "max_daily_minutes",
+)
+
+
+def _normalize_prompt_params(raw, keys: tuple[str, ...]) -> dict:
+    """对 strategy_params / wellbeing 做白名单规范化。
+
+    仅保留白名单键、且值为 int/float（非 bool）的项；非法类型与未知键被丢弃，
+    从而保证任意 YAML 内容都不会让下游崩坏（下游按 key 用代码常量兜底默认）。
+    """
+    if not isinstance(raw, dict):
+        return {}
+    normalized: dict = {}
+    for key in keys:
+        value = raw.get(key)
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            normalized[key] = value
+    return normalized
+
+
+def load_prompts() -> dict:
+    """读取 backend/configs/prompts.yaml 配置源。
+
+    返回结构：
+    - system_prompt / mode_a_prompt / mode_b_prompt / mode_weekend_prompt：str
+      （缺失或非字符串时为空串 ""）
+    - strategy_params / wellbeing：dict（白名单规范化后的数值映射）
+
+    行为约定：
+    - 文件不存在 / 损坏（YAML 解析失败或非 dict）时返回 {}，绝不抛异常。
+    - 进程内缓存 + 文件 mtime 失效（文件改动后下一次调用自动重载）。
+    - PyYAML 仅在本函数内惰性引入（配置层专用）。
+    """
+    global _PROMPTS_CACHE, _PROMPTS_CACHE_MTIME
+    try:
+        mtime = _PROMPTS_FILE.stat().st_mtime
+    except OSError:
+        _PROMPTS_CACHE = {}
+        _PROMPTS_CACHE_MTIME = -1.0
+        return {}
+
+    if mtime == _PROMPTS_CACHE_MTIME:
+        return _PROMPTS_CACHE
+
+    try:
+        import yaml
+
+        data = yaml.safe_load(_PROMPTS_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        data = None
+    if not isinstance(data, dict):
+        # 文件损坏（解析失败或内容非 dict 映射）→ 与文件缺失一致返回 {}，绝不抛异常
+        _PROMPTS_CACHE = {}
+        _PROMPTS_CACHE_MTIME = mtime
+        return {}
+
+    def _text(key: str) -> str:
+        value = data.get(key)
+        return value if isinstance(value, str) else ""
+
+    _PROMPTS_CACHE = {
+        "system_prompt": _text("system_prompt"),
+        "mode_a_prompt": _text("mode_a_prompt"),
+        "mode_b_prompt": _text("mode_b_prompt"),
+        "mode_weekend_prompt": _text("mode_weekend_prompt"),
+        "strategy_params": _normalize_prompt_params(
+            data.get("strategy_params"), _PROMPTS_STRATEGY_PARAM_KEYS
+        ),
+        "wellbeing": _normalize_prompt_params(
+            data.get("wellbeing"), _PROMPTS_WELLBEING_KEYS
+        ),
+    }
+    _PROMPTS_CACHE_MTIME = mtime
+    return _PROMPTS_CACHE

@@ -3,6 +3,8 @@ import base64
 import logging
 from typing import Any
 
+from backend import config
+
 logger = logging.getLogger(__name__)
 
 VISION_MODEL = "deepseek-v4-flash-vision-exp"
@@ -38,11 +40,10 @@ def recognize_image_sync(image_bytes: bytes, suffix: str = ".jpg") -> dict:
     """使用 DeepSeek-V4-Flash-Vision 识别图片内容。"""
     try:
         from openai import OpenAI
-        import os
-        
-        api_key = os.environ.get("DEEPSEEK_API_KEY", "")
+
+        api_key = config.get_api_key()
         if not api_key:
-            return {"available": False, "error": "DEEPSEEK_API_KEY not set"}
+            return {"available": False, "error": "API Key 未配置"}
         
         client = OpenAI(
             api_key=api_key,

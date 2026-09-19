@@ -6,6 +6,7 @@ python-dotenv>=1.0.0
 pydantic>=2.9.0
 python-multipart>=0.0.9
 sympy>=1.13.0
+PyYAML>=6.0
 
 # 可选：拍照传题（OCR文字识别，首次运行自动下载模型约60MB）
 # rapidocr-onnxruntime>=1.3.0

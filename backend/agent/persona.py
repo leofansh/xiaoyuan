@@ -3,7 +3,12 @@
 系统提示词按学生状态动态组装，全部规则源自《初中数学成长方案》。
 """
 
-from backend.config import SESSION_BASELINE_MINUTES, SESSION_DEEP_MINUTES, get_pure_mode
+from backend.config import (
+    SESSION_BASELINE_MINUTES,
+    SESSION_DEEP_MINUTES,
+    get_pure_mode,
+    load_prompts,
+)
 from backend.knowledge import syllabus
 from backend.models.student import CognitiveProfile, Student
 from backend.agent.thinking_models import THINKING_MODELS, get_model, select_thinking_model
@@ -199,8 +204,26 @@ def _thinking_model_hint(student: Student, current_topic_id: str) -> str:
     return f"## 本题思维方法引导\n- 本题适合用{model.name}：{hint}"
 
 
+def _persona_core() -> str:
+    """读取 YAML 配置的 system_prompt 主段落（YAML 优先，PERSONA_CORE 常量兜底，架构优化 I2）。"""
+    core = load_prompts().get("system_prompt")
+    return core if isinstance(core, str) and core.strip() else PERSONA_CORE
+
+
+def _render_mode(template: str, session_minutes: int) -> str:
+    """渲染模式话术模板（{session_minutes} 占位符），非法模板原样返回不抛异常。"""
+    try:
+        return template.format(session_minutes=session_minutes)
+    except (KeyError, ValueError):
+        return template
+
+
 def _mode_instructions(mode: str) -> str:
+    prompts = load_prompts()
     if mode == "A":
+        template = prompts.get("mode_a_prompt")
+        if isinstance(template, str) and template.strip():
+            return _render_mode(template, SESSION_DEEP_MINUTES)
         return f"""
 ## 当前模式：A 深度成长模式（目标时长{SESSION_DEEP_MINUTES}分钟左右）
 流程引导顺序：
@@ -215,6 +238,9 @@ def _mode_instructions(mode: str) -> str:
 7. WRAP_UP 元认知收尾：问"今天学的这个方法，你觉得什么时候还能用？"——评估迁移能力
 时间提醒：当 session_progress 超过0.85时，主动开始收尾总结。"""
     if mode == "B":
+        template = prompts.get("mode_b_prompt")
+        if isinstance(template, str) and template.strip():
+            return _render_mode(template, SESSION_BASELINE_MINUTES)
         return f"""
 ## 当前模式：B 保底维稳模式（极致底线{SESSION_BASELINE_MINUTES}分钟）
 - 你的回复要极简快速，每次1-2句话，不展开讲原理
@@ -223,6 +249,9 @@ def _mode_instructions(mode: str) -> str:
 - 其余问题一律温柔收纳："这个记下来周末一起处理～"
 - 明确肯定她："今天守住底线就是胜利，保底不是摆烂哦"
 - 快速完成两步后立即进入 WRAP_UP 收尾"""
+    template = prompts.get("mode_weekend_prompt")
+    if isinstance(template, str) and template.strip():
+        return template
     return """
 ## 当前模式：周末修复模式（约30分钟，可减半不可取消）
 - 目标：清零本周所有概念类漏洞
@@ -377,9 +406,9 @@ def _cognitive_adaptation(profile: CognitiveProfile) -> str:
 def build_system_prompt(student: Student) -> str:
     # V3.0 P0：轻量首学模式优先级高于常规模式
     if getattr(student.current_session, 'lightweight_mode', False):
-        prompt = PERSONA_CORE + _lightweight_mode_instructions()
+        prompt = _persona_core() + _lightweight_mode_instructions()
     else:
-        prompt = PERSONA_CORE + _mode_instructions(
+        prompt = _persona_core() + _mode_instructions(
             student.current_session.mode or "A"
         )
 
